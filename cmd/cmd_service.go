@@ -307,10 +307,6 @@ var serviceInitCmd = &cobra.Command{
 		userDataDir := route.GetConfigDir()
 		keyDir := filepath.Join(userDataDir, "sparkle", "keys")
 
-		log.Println("配置目录：", userDataDir)
-		log.Println("密钥目录：", keyDir)
-		log.Println("公钥内容：", publicKey)
-
 		_ = route.InitKeyManager(keyDir)
 
 		km := route.GetKeyManager()
@@ -320,6 +316,37 @@ var serviceInitCmd = &cobra.Command{
 		}
 
 		log.Println("服务初始化成功，公钥已保存")
+
+		svcConfig := createServiceConfig("")
+		listenAddr := listen
+		if listenAddr == "" {
+			listenAddr = defaultAddr
+		}
+		prg := &Program{listen: listenAddr}
+		s, err := service.New(prg, svcConfig)
+		if err != nil {
+			log.Println("创建服务失败：", err)
+			return
+		}
+
+		status, err := s.Status()
+		if err != nil {
+			log.Println("查询服务状态失败：", err)
+			log.Println("提示：如果服务正在运行，请手动执行 'restart' 命令")
+			return
+		}
+
+		if status == service.StatusRunning {
+			log.Println("正在重启服务...")
+			if err := s.Restart(); err != nil {
+				log.Println("重启服务失败：", err)
+				log.Println("请手动执行 'sparkle-service service restart' 命令")
+				return
+			}
+			log.Println("服务已成功重启")
+		} else {
+			log.Println("服务未运行，配置将在下次启动时生效")
+		}
 	},
 }
 

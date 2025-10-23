@@ -59,9 +59,6 @@ func Start(addr string) error {
 
 	keyDir := filepath.Join(userDataDir, "sparkle", "keys")
 
-	log.Printf("配置目录: %s", userDataDir)
-	log.Printf("密钥目录: %s", keyDir)
-
 	if err := InitKeyManager(keyDir); err != nil {
 		log.Printf("警告: 初始化密钥管理器失败: %v", err)
 	}
@@ -79,15 +76,6 @@ func Start(addr string) error {
 		}
 	} else {
 		if err := startServer(addr, StartUnix); err != nil {
-			return err
-		}
-	}
-	if runtime.GOOS == "windows" {
-		if err := startServer("127.0.0.1:10001", StartHTTP); err != nil {
-			return err
-		}
-	} else {
-		if err := startServer("127.0.0.1:10010", StartHTTP); err != nil {
 			return err
 		}
 	}
