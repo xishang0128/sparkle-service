@@ -128,6 +128,10 @@ var serviceInstallCmd = &cobra.Command{
 			log.Println("安装服务失败：", err)
 			return
 		}
+		if err := s.Start(); err != nil {
+			log.Println("启动服务失败：", err)
+			return
+		}
 		log.Println("服务安装成功")
 	},
 }
@@ -149,6 +153,10 @@ var serviceUninstallCmd = &cobra.Command{
 			return
 		}
 
+		if err := s.Stop(); err != nil {
+			log.Println("停止服务失败：", err)
+			return
+		}
 		if err := s.Uninstall(); err != nil {
 			log.Println("卸载服务失败：", err)
 			return
