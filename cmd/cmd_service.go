@@ -15,7 +15,6 @@ type Program struct {
 }
 
 func (p *Program) Start(s service.Service) error {
-	log.Println("服务启动中...")
 	go p.run()
 	return nil
 }
@@ -95,6 +94,7 @@ func (p *Program) run() {
 		log.Printf("初始化日志失败：%v\n", err)
 	}
 	defer logFile.Close()
+	log.Println("服务启动中...")
 
 	if err := route.Start(p.listen); err != nil {
 		log.Fatal(err)

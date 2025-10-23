@@ -23,35 +23,14 @@ func GetConfigDir() string {
 		return dir
 	}
 
-	homeDir := os.Getenv("HOME")
-	if homeDir == "" {
-		homeDir = os.ExpandEnv("$HOME")
-	}
-
-	if homeDir == "" {
-		if dir, err := os.UserConfigDir(); err == nil {
-			return dir
-		}
-	}
-
 	switch runtime.GOOS {
-	case "darwin":
-		if homeDir == "" || os.Getuid() == 0 {
-			homeDir = "/var/root"
-		}
-		return filepath.Join(homeDir, "Library", "Application Support")
 	case "windows":
-		if appdata := os.Getenv("APPDATA"); appdata != "" {
-			return appdata
-		}
-		if dir, err := os.UserConfigDir(); err == nil {
-			return dir
-		}
+		return `C:\ProgramData`
+	case "darwin":
+		return filepath.Join("/var/root", "Library", "Application Support")
 	default:
-		return filepath.Join(homeDir, ".config")
+		return filepath.Join("/root", ".config")
 	}
-
-	return filepath.Join(homeDir, ".config")
 }
 
 func Start(addr string) error {
@@ -95,13 +74,15 @@ func startServer(addr string, startFunc func(string) error) error {
 	}
 
 	if len(addr) > 0 {
-		dir := filepath.Dir(addr)
-		if err := ensureDirExists(dir); err != nil {
-			return err
-		}
+		if runtime.GOOS != "windows" {
+			dir := filepath.Dir(addr)
+			if err := ensureDirExists(dir); err != nil {
+				return err
+			}
 
-		if err := syscall.Unlink(addr); err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("unlink 错误：%w", err)
+			if err := syscall.Unlink(addr); err != nil && !os.IsNotExist(err) {
+				return fmt.Errorf("unlink 错误：%w", err)
+			}
 		}
 
 		if err := startFunc(addr); err != nil {

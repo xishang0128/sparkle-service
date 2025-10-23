@@ -78,6 +78,9 @@ func (km *KeyManager) SetPublicKey(pubKeyBase64 string) error {
 func (km *KeyManager) loadPublicKey() error {
 	pubKeyPEM, err := os.ReadFile(km.keyPath)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("公钥文件不存在（未初始化）")
+		}
 		return fmt.Errorf("读取公钥文件失败： %w", err)
 	}
 
