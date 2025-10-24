@@ -3,11 +3,31 @@ package route
 import (
 	"encoding/json"
 	"net/http"
+
+	"github.com/go-chi/render"
 )
+
+type Request struct {
+	Server string `json:"server,omitempty"`
+	Bypass string `json:"bypass,omitempty"`
+	Url    string `json:"url,omitempty"`
+
+	Device           string `json:"device,omitempty"`
+	OnlyActiveDevice bool   `json:"only_active_device,omitempty"`
+
+	Servers []string `json:"servers,omitempty"`
+}
 
 type Response struct {
 	Status  string `json:"status"`
 	Message string `json:"message"`
+}
+
+func decodeRequest(r *http.Request, v any) error {
+	if r.ContentLength > 0 {
+		return render.DecodeJSON(r.Body, v)
+	}
+	return nil
 }
 
 func requestLogger(next http.Handler) http.Handler {

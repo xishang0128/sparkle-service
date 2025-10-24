@@ -10,15 +10,6 @@ import (
 	"github.com/xishang0128/sysproxy-go/sysproxy"
 )
 
-type Request struct {
-	Server string `json:"server"`
-	Bypass string `json:"bypass"`
-	Url    string `json:"url"`
-
-	Device           string `json:"device,omitempty"`
-	OnlyActiveDevice bool   `json:"only_active_device,omitempty"`
-}
-
 func httpProxyRouter() http.Handler {
 	r := chi.NewRouter()
 	r.Get("/status", status)
@@ -88,11 +79,4 @@ func disable(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	render.NoContent(w, r)
-}
-
-func decodeRequest(r *http.Request, v any) error {
-	if r.ContentLength > 0 {
-		return render.DecodeJSON(r.Body, v)
-	}
-	return nil
 }

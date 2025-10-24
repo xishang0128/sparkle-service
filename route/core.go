@@ -14,7 +14,7 @@ var (
 	isInit atomic.Bool
 )
 
-func coreManager() http.Handler {
+func coreManagerRouter() http.Handler {
 	if !isInit.Load() {
 		cm = core.NewCoreManager()
 		isInit.Store(true)
