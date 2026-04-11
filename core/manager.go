@@ -86,7 +86,7 @@ func (cm *CoreManager) startProcess() error {
 
 	if err := cmd.Start(); err != nil {
 		cm.isRunning.Store(false)
-		return fmt.Errorf("启动核心进程失败: %w", err)
+		return fmt.Errorf("启动核心进程失败：%w", err)
 	}
 
 	cm.cmd = cmd
@@ -203,7 +203,7 @@ func (cm *CoreManager) monitorPID() {
 			}
 
 			if newPID != cm.pid.Load() {
-				log.Printf("检测到核心进程PID变化 (PID: %d -> %d)", cm.pid.Load(), newPID)
+				log.Printf("检测到核心进程 PID 变化 (PID: %d -> %d)", cm.pid.Load(), newPID)
 				cm.updatePID(newPID)
 			}
 		case <-cm.stopChan:
@@ -369,8 +369,8 @@ func (cm *CoreManager) convertGBKToUTF8(b []byte) string {
 }
 
 func (cm *CoreManager) extractFatalError(output string) error {
-	if msgStart := strings.Index(output, "level=fatal msg="); msgStart != -1 {
-		msg := strings.TrimSpace(output[msgStart+16:])
+	if _, after, ok := strings.Cut(output, "level=fatal msg="); ok {
+		msg := strings.TrimSpace(after)
 		return fmt.Errorf("启动核心进程失败: %s", msg)
 	}
 	return fmt.Errorf("启动核心进程失败：发现致命错误")
