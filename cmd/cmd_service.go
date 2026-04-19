@@ -27,7 +27,6 @@ func createServiceConfig(executablePath string) *service.Config {
 	case "unix-systemv":
 		options["SysvScript"] = sysvScript
 	case "windows-service":
-		options["DelayedAutoStart"] = true
 	default:
 		depends = append(depends, "After=network-online.target")
 	}
