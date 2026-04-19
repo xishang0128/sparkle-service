@@ -60,6 +60,10 @@ github.com/xishang0128/sysproxy-go v0.0.0-20251022110932-8ec67a93fb7f h1:/l1jZo7
 github.com/xishang0128/sysproxy-go v0.0.0-20251022110932-8ec67a93fb7f/go.mod h1:gYkQaKhRdqqRlAM6FEaQHXb7GSG3mtrDU505LfFn6AY=
 github.com/xishang0128/sysproxy-go v0.0.0-20260411041225-a55ac48c72a1 h1:Xl8cuE8y7DZFNTH1Vst16SKYStzutelFroDzU8s0EjA=
 github.com/xishang0128/sysproxy-go v0.0.0-20260411041225-a55ac48c72a1/go.mod h1:9dHDgNwx/JCi3is1c9rLSF4gUfdR2r21ADAACJepEP0=
+github.com/xishang0128/sysproxy-go v0.0.0-20260419202222-b0e86f008ab3 h1:fjdzomFwvzE+XLjXalwUjSUo3KKLZ16b/8acVUPVEa0=
+github.com/xishang0128/sysproxy-go v0.0.0-20260419202222-b0e86f008ab3/go.mod h1:9dHDgNwx/JCi3is1c9rLSF4gUfdR2r21ADAACJepEP0=
+github.com/xishang0128/sysproxy-go v0.0.0-20260419202933-428550205fa7 h1:N0lFHu8LO2BLLLtGovbS0aML9fq8q6uS7wlFjNlFASw=
+github.com/xishang0128/sysproxy-go v0.0.0-20260419202933-428550205fa7/go.mod h1:9dHDgNwx/JCi3is1c9rLSF4gUfdR2r21ADAACJepEP0=
 github.com/yusufpapurcu/wmi v1.2.4 h1:zFUKzehAFReQwLys1b/iSMl+JQGSCSjtVqQn9bBrPo0=
 github.com/yusufpapurcu/wmi v1.2.4/go.mod h1:SBZ9tNy3G9/m5Oi98Zks0QjeHVDvuK0qfxQmPyzfmi0=
 go.yaml.in/yaml/v3 v3.0.4/go.mod h1:DhzuOOF2ATzADvBadXxruRBLzYTpT36CKvDb3+aBEFg=

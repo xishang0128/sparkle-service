@@ -8,7 +8,7 @@ require (
 	github.com/kardianos/service v1.2.4
 	github.com/shirou/gopsutil/v4 v4.26.3
 	github.com/spf13/cobra v1.10.2
-	github.com/xishang0128/sysproxy-go v0.0.0-20260411041225-a55ac48c72a1
+	github.com/xishang0128/sysproxy-go v0.0.0-20260419202933-428550205fa7
 	golang.org/x/sys v0.43.0
 	golang.org/x/text v0.36.0
 )

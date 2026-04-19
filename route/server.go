@@ -138,6 +138,7 @@ func StartPipe(addr string) error {
 	server := &http.Server{
 		Handler: router(),
 	}
+	configurePipeServer(server)
 	pipeServer = server
 	return server.Serve(l)
 }

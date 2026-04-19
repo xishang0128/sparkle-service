@@ -14,7 +14,12 @@ var proxyCmd = &cobra.Command{
 	Short: "设置系统代理",
 	Run: func(cmd *cobra.Command, args []string) {
 		t := time.Now()
-		err := sysproxy.SetProxy(server, bypass, device, onlyActiveDevice)
+		err := sysproxy.SetProxy(&sysproxy.Options{
+			Proxy:            server,
+			Bypass:           bypass,
+			Device:           device,
+			OnlyActiveDevice: onlyActiveDevice,
+		})
 		if err != nil {
 			fmt.Println("设置代理失败：", err)
 			return
@@ -28,7 +33,11 @@ var pacCmd = &cobra.Command{
 	Short: "设置 PAC 代理",
 	Run: func(cmd *cobra.Command, args []string) {
 		t := time.Now()
-		err := sysproxy.SetPac(pacUrl, device, onlyActiveDevice)
+		err := sysproxy.SetPac(&sysproxy.Options{
+			PACURL:           pacUrl,
+			Device:           device,
+			OnlyActiveDevice: onlyActiveDevice,
+		})
 		if err != nil {
 			fmt.Println("设置 PAC 代理失败：", err)
 			return
@@ -42,7 +51,10 @@ var disableCmd = &cobra.Command{
 	Short: "取消代理设置",
 	Run: func(cmd *cobra.Command, args []string) {
 		t := time.Now()
-		err := sysproxy.DisableProxy(device, onlyActiveDevice)
+		err := sysproxy.DisableProxy(&sysproxy.Options{
+			Device:           device,
+			OnlyActiveDevice: onlyActiveDevice,
+		})
 		if err != nil {
 			fmt.Println("取消代理设置失败：", err)
 			return
@@ -55,7 +67,10 @@ var statusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "查看当前代理设置",
 	Run: func(cmd *cobra.Command, args []string) {
-		status, err := sysproxy.QueryProxySettings(device, onlyActiveDevice)
+		status, err := sysproxy.QueryProxySettings(&sysproxy.Options{
+			Device:           device,
+			OnlyActiveDevice: onlyActiveDevice,
+		})
 		if err != nil {
 			fmt.Println("查询代理设置失败：", err)
 			return
