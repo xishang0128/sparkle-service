@@ -21,9 +21,10 @@ func httpProxyRouter() http.Handler {
 
 func status(w http.ResponseWriter, r *http.Request) {
 	t := time.Now()
+	opts := prepareSysproxyOptions(r, &sysproxy.Options{OnlyActiveDevice: true})
 	var status any
 	err := runSysproxyAsRequestUser(r, func() error {
-		result, err := sysproxy.QueryProxySettings(&sysproxy.Options{OnlyActiveDevice: true})
+		result, err := sysproxy.QueryProxySettings(opts)
 		if err != nil {
 			return err
 		}
@@ -46,12 +47,13 @@ func pac(w http.ResponseWriter, r *http.Request) {
 	}
 
 	t := time.Now()
+	opts := prepareSysproxyOptions(r, &sysproxy.Options{
+		PACURL:           req.Url,
+		Device:           req.Device,
+		OnlyActiveDevice: req.OnlyActiveDevice,
+	})
 	err := runSysproxyAsRequestUser(r, func() error {
-		return sysproxy.SetPac(&sysproxy.Options{
-			PACURL:           req.Url,
-			Device:           req.Device,
-			OnlyActiveDevice: req.OnlyActiveDevice,
-		})
+		return sysproxy.SetPac(opts)
 	})
 	log.Println("设置 PAC 耗时：", time.Since(t), "\nURL:", req.Url)
 	if err != nil {
@@ -69,13 +71,14 @@ func proxy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	t := time.Now()
+	opts := prepareSysproxyOptions(r, &sysproxy.Options{
+		Proxy:            req.Server,
+		Bypass:           req.Bypass,
+		Device:           req.Device,
+		OnlyActiveDevice: req.OnlyActiveDevice,
+	})
 	err := runSysproxyAsRequestUser(r, func() error {
-		return sysproxy.SetProxy(&sysproxy.Options{
-			Proxy:            req.Server,
-			Bypass:           req.Bypass,
-			Device:           req.Device,
-			OnlyActiveDevice: req.OnlyActiveDevice,
-		})
+		return sysproxy.SetProxy(opts)
 	})
 	log.Println("设置代理耗时：", time.Since(t), "\nserver:", req.Server, "\nbypass:", req.Bypass)
 	if err != nil {
@@ -93,11 +96,12 @@ func disable(w http.ResponseWriter, r *http.Request) {
 	}
 
 	t := time.Now()
+	opts := prepareSysproxyOptions(r, &sysproxy.Options{
+		Device:           req.Device,
+		OnlyActiveDevice: req.OnlyActiveDevice,
+	})
 	err := runSysproxyAsRequestUser(r, func() error {
-		return sysproxy.DisableProxy(&sysproxy.Options{
-			Device:           req.Device,
-			OnlyActiveDevice: req.OnlyActiveDevice,
-		})
+		return sysproxy.DisableProxy(opts)
 	})
 	log.Println("禁用代理耗时：", time.Since(t))
 	if err != nil {

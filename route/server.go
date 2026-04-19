@@ -124,6 +124,7 @@ func StartUnix(addr string) error {
 	server := &http.Server{
 		Handler: router(),
 	}
+	configurePipeServer(server)
 	unixServer = server
 	return server.Serve(l)
 }
