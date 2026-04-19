@@ -22,6 +22,7 @@ func router() *chi.Mux {
 		r.Get("/test", func(w http.ResponseWriter, r *http.Request) {
 			sendJSON(w, "", "auth success")
 		})
+		r.Mount("/service", serviceRouter())
 		r.Mount("/sysproxy", httpProxyRouter())
 		r.Mount("/core", coreManagerRouter())
 		r.Mount("/sys", sysRouter())

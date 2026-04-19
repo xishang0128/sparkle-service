@@ -5,8 +5,9 @@ import (
 	"path/filepath"
 	"sparkle-service/log"
 	"sparkle-service/route"
+	appservice "sparkle-service/service"
 
-	"github.com/kardianos/service"
+	kservice "github.com/kardianos/service"
 	"github.com/spf13/cobra"
 )
 
@@ -14,78 +15,10 @@ type Program struct {
 	listen string
 }
 
-func (p *Program) Start(s service.Service) error {
+func (p *Program) Start(s kservice.Service) error {
 	go p.run()
 	return nil
 }
-
-func createServiceConfig(executablePath string) *service.Config {
-	options := make(service.KeyValue)
-	var depends []string
-
-	switch service.ChosenSystem().String() {
-	case "unix-systemv":
-		options["SysvScript"] = sysvScript
-	case "windows-service":
-	default:
-		depends = append(depends, "After=network-online.target")
-	}
-
-	options["RunAtLoadOnMac"] = true
-
-	return &service.Config{
-		Name:         "SparkleService",
-		DisplayName:  "Sparkle Service",
-		Description:  "Sparkle 提权服务",
-		Executable:   executablePath,
-		Arguments:    []string{"service", "run"},
-		Dependencies: depends,
-		Option:       options,
-	}
-}
-
-// sysvScript 用于 SysV Init 系统的启动脚本配置
-var sysvScript = `#!/bin/sh /etc/rc.common
-DESCRIPTION="{{.Description}}"
-cmd="{{.Path}}"
-name="SparkleService"
-pid_file="/var/run/$name.pid"
-
-start() {
-	echo "Starting $name"
-	$cmd >> /dev/null 2>&1 &
-	echo $! > "$pid_file"
-}
-
-stop() {
-	if [ -f "$pid_file" ]; then
-		kill $(cat "$pid_file") 2>/dev/null
-		rm "$pid_file"
-	fi
-	echo "Stopped $name"
-}
-
-restart() {
-	stop
-	start
-}
-
-case "$1" in
-	start)
-		start
-		;;
-	stop)
-		stop
-		;;
-	restart)
-		restart
-		;;
-	*)
-		echo "Usage: $0 {start|stop|restart}"
-		exit 1
-esac
-exit 0
-`
 
 func (p *Program) run() {
 	logFile, err := log.InitLogging()
@@ -100,7 +33,7 @@ func (p *Program) run() {
 	}
 }
 
-func (p *Program) Stop(s service.Service) error {
+func (p *Program) Stop(s kservice.Service) error {
 	log.Println("服务停止中...")
 	return nil
 }
@@ -114,10 +47,8 @@ var serviceInstallCmd = &cobra.Command{
 			listenAddr = defaultAddr
 		}
 
-		svcConfig := createServiceConfig(os.Args[0])
-
 		prg := &Program{listen: listenAddr}
-		s, err := service.New(prg, svcConfig)
+		s, err := appservice.New(prg, os.Args[0])
 		if err != nil {
 			log.Println("创建服务失败：", err)
 			return
@@ -139,14 +70,12 @@ var serviceUninstallCmd = &cobra.Command{
 	Use:   "uninstall",
 	Short: "卸载 Sparkle 服务",
 	Run: func(cmd *cobra.Command, args []string) {
-		svcConfig := createServiceConfig("")
-
 		listenAddr := listen
 		if listenAddr == "" {
 			listenAddr = defaultAddr
 		}
 		prg := &Program{listen: listenAddr}
-		s, err := service.New(prg, svcConfig)
+		s, err := appservice.New(prg, "")
 		if err != nil {
 			log.Println("创建服务失败：", err)
 			return
@@ -168,14 +97,12 @@ var serviceStartCmd = &cobra.Command{
 	Use:   "start",
 	Short: "启动 Sparkle 服务",
 	Run: func(cmd *cobra.Command, args []string) {
-		svcConfig := createServiceConfig("")
-
 		listenAddr := listen
 		if listenAddr == "" {
 			listenAddr = defaultAddr
 		}
 		prg := &Program{listen: listenAddr}
-		s, err := service.New(prg, svcConfig)
+		s, err := appservice.New(prg, "")
 		if err != nil {
 			log.Println("创建服务失败：", err)
 			return
@@ -193,14 +120,12 @@ var serviceStopCmd = &cobra.Command{
 	Use:   "stop",
 	Short: "停止 Sparkle 服务",
 	Run: func(cmd *cobra.Command, args []string) {
-		svcConfig := createServiceConfig("")
-
 		listenAddr := listen
 		if listenAddr == "" {
 			listenAddr = defaultAddr
 		}
 		prg := &Program{listen: listenAddr}
-		s, err := service.New(prg, svcConfig)
+		s, err := appservice.New(prg, "")
 		if err != nil {
 			log.Println("创建服务失败：", err)
 			return
@@ -218,14 +143,12 @@ var serviceRestartCmd = &cobra.Command{
 	Use:   "restart",
 	Short: "重启 Sparkle 服务",
 	Run: func(cmd *cobra.Command, args []string) {
-		svcConfig := createServiceConfig("")
-
 		listenAddr := listen
 		if listenAddr == "" {
 			listenAddr = defaultAddr
 		}
 		prg := &Program{listen: listenAddr}
-		s, err := service.New(prg, svcConfig)
+		s, err := appservice.New(prg, "")
 		if err != nil {
 			log.Println("创建服务失败：", err)
 			return
@@ -243,14 +166,12 @@ var serviceStatusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "查看 Sparkle 服务状态",
 	Run: func(cmd *cobra.Command, args []string) {
-		svcConfig := createServiceConfig("")
-
 		listenAddr := listen
 		if listenAddr == "" {
 			listenAddr = defaultAddr
 		}
 		prg := &Program{listen: listenAddr}
-		s, err := service.New(prg, svcConfig)
+		s, err := appservice.New(prg, "")
 		if err != nil {
 			log.Println("创建服务失败：", err)
 			return
@@ -263,11 +184,11 @@ var serviceStatusCmd = &cobra.Command{
 		}
 
 		switch status {
-		case service.StatusRunning:
+		case kservice.StatusRunning:
 			log.Println("服务状态：运行中")
-		case service.StatusStopped:
+		case kservice.StatusStopped:
 			log.Println("服务状态：已停止")
-		case service.StatusUnknown:
+		case kservice.StatusUnknown:
 			log.Println("服务状态：未知")
 		default:
 			log.Println("服务状态：未知")
@@ -279,14 +200,12 @@ var serviceRunCmd = &cobra.Command{
 	Use:   "run",
 	Short: "运行 Sparkle 服务",
 	Run: func(cmd *cobra.Command, args []string) {
-		svcConfig := createServiceConfig("")
-
 		listenAddr := listen
 		if listenAddr == "" {
 			listenAddr = defaultAddr
 		}
 		prg := &Program{listen: listenAddr}
-		s, err := service.New(prg, svcConfig)
+		s, err := appservice.New(prg, "")
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -324,13 +243,12 @@ var serviceInitCmd = &cobra.Command{
 
 		log.Println("服务初始化成功，公钥已保存")
 
-		svcConfig := createServiceConfig("")
 		listenAddr := listen
 		if listenAddr == "" {
 			listenAddr = defaultAddr
 		}
 		prg := &Program{listen: listenAddr}
-		s, err := service.New(prg, svcConfig)
+		s, err := appservice.New(prg, "")
 		if err != nil {
 			log.Println("创建服务失败：", err)
 			return
@@ -343,7 +261,7 @@ var serviceInitCmd = &cobra.Command{
 			return
 		}
 
-		if status == service.StatusRunning {
+		if status == kservice.StatusRunning {
 			log.Println("正在重启服务...")
 			if err := s.Restart(); err != nil {
 				log.Println("重启服务失败：", err)
