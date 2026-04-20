@@ -19,6 +19,7 @@ var proxyCmd = &cobra.Command{
 			Bypass:           bypass,
 			Device:           device,
 			OnlyActiveDevice: onlyActiveDevice,
+			UseRegistry:      useRegistry,
 		})
 		if err != nil {
 			fmt.Println("设置代理失败：", err)
@@ -37,6 +38,7 @@ var pacCmd = &cobra.Command{
 			PACURL:           pacUrl,
 			Device:           device,
 			OnlyActiveDevice: onlyActiveDevice,
+			UseRegistry:      useRegistry,
 		})
 		if err != nil {
 			fmt.Println("设置 PAC 代理失败：", err)
@@ -54,6 +56,7 @@ var disableCmd = &cobra.Command{
 		err := sysproxy.DisableProxy(&sysproxy.Options{
 			Device:           device,
 			OnlyActiveDevice: onlyActiveDevice,
+			UseRegistry:      useRegistry,
 		})
 		if err != nil {
 			fmt.Println("取消代理设置失败：", err)
@@ -70,6 +73,7 @@ var statusCmd = &cobra.Command{
 		status, err := sysproxy.QueryProxySettings(&sysproxy.Options{
 			Device:           device,
 			OnlyActiveDevice: onlyActiveDevice,
+			UseRegistry:      useRegistry,
 		})
 		if err != nil {
 			fmt.Println("查询代理设置失败：", err)

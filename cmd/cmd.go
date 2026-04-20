@@ -13,6 +13,7 @@ var (
 
 	device           string
 	onlyActiveDevice bool
+	useRegistry      bool
 
 	listen      string
 	defaultAddr string
@@ -38,6 +39,7 @@ func init() {
 	MainCmd.AddCommand(serviceCmd)
 
 	MainCmd.PersistentFlags().BoolVarP(&onlyActiveDevice, "only-active-device", "a", false, "仅对活跃的网络设备生效")
+	MainCmd.PersistentFlags().BoolVarP(&useRegistry, "use-registry", "r", false, "使用注册表设置")
 	MainCmd.PersistentFlags().StringVarP(&device, "device", "d", "", "指定网络设备")
 	MainCmd.PersistentFlags().StringVarP(&listen, "listen", "l", defaultAddr, "监听地址")
 

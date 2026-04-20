@@ -51,6 +51,7 @@ func pac(w http.ResponseWriter, r *http.Request) {
 		PACURL:           req.Url,
 		Device:           req.Device,
 		OnlyActiveDevice: req.OnlyActiveDevice,
+		UseRegistry:      req.UseRegistry,
 	})
 	err := runSysproxyAsRequestUser(r, func() error {
 		return sysproxy.SetPac(opts)
@@ -76,6 +77,7 @@ func proxy(w http.ResponseWriter, r *http.Request) {
 		Bypass:           req.Bypass,
 		Device:           req.Device,
 		OnlyActiveDevice: req.OnlyActiveDevice,
+		UseRegistry:      req.UseRegistry,
 	})
 	err := runSysproxyAsRequestUser(r, func() error {
 		return sysproxy.SetProxy(opts)
@@ -99,6 +101,7 @@ func disable(w http.ResponseWriter, r *http.Request) {
 	opts := prepareSysproxyOptions(r, &sysproxy.Options{
 		Device:           req.Device,
 		OnlyActiveDevice: req.OnlyActiveDevice,
+		UseRegistry:      req.UseRegistry,
 	})
 	err := runSysproxyAsRequestUser(r, func() error {
 		return sysproxy.DisableProxy(opts)
