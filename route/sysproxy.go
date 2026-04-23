@@ -1,6 +1,7 @@
 package route
 
 import (
+	"fmt"
 	"net/http"
 	"sparkle-service/log"
 	"time"
@@ -42,7 +43,7 @@ func status(w http.ResponseWriter, r *http.Request) {
 func pac(w http.ResponseWriter, r *http.Request) {
 	var req Request
 	if err := decodeRequest(r, &req); err != nil {
-		sendError(w, err)
+		sendError(w, badRequestError(fmt.Sprintf("无效的请求体: %v", err)))
 		return
 	}
 
@@ -67,7 +68,7 @@ func pac(w http.ResponseWriter, r *http.Request) {
 func proxy(w http.ResponseWriter, r *http.Request) {
 	var req Request
 	if err := decodeRequest(r, &req); err != nil {
-		sendError(w, err)
+		sendError(w, badRequestError(fmt.Sprintf("无效的请求体: %v", err)))
 		return
 	}
 
@@ -93,7 +94,7 @@ func proxy(w http.ResponseWriter, r *http.Request) {
 func disable(w http.ResponseWriter, r *http.Request) {
 	var req Request
 	if err := decodeRequest(r, &req); err != nil {
-		sendError(w, err)
+		sendError(w, badRequestError(fmt.Sprintf("无效的请求体: %v", err)))
 		return
 	}
 

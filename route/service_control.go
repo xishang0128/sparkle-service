@@ -1,7 +1,6 @@
 package route
 
 import (
-	"fmt"
 	"net/http"
 	"time"
 
@@ -45,11 +44,11 @@ func controlServiceAsync(w http.ResponseWriter, action string, message string, f
 	}
 
 	if action == "restart" && status == appservice.StatusStopped {
-		sendError(w, fmt.Errorf("服务未运行"))
+		sendError(w, conflictError("服务未运行"))
 		return
 	}
 
-	sendJSON(w, "success", message)
+	sendJSONWithStatus(w, http.StatusAccepted, "success", message)
 
 	go func() {
 		time.Sleep(200 * time.Millisecond)

@@ -48,6 +48,11 @@ func Start(addr string) error {
 	} else {
 		log.Println("警告：密钥管理器未初始化")
 	}
+	if km.HasAuthorizedPrincipal() {
+		log.Println("请求方身份绑定已启用")
+	} else {
+		log.Println("警告：请求方身份绑定未启用")
+	}
 
 	if runtime.GOOS == "windows" {
 		if err := startServer(addr, StartPipe); err != nil {
@@ -118,7 +123,19 @@ func StartUnix(addr string) error {
 	if err != nil {
 		return fmt.Errorf("unix 监听错误：%w", err)
 	}
-	_ = os.Chmod(addr, 0o666)
+	if uid, ok := GetKeyManager().GetAuthorizedUID(); ok {
+		if err := os.Chown(addr, int(uid), -1); err != nil {
+			_ = l.Close()
+			return fmt.Errorf("设置 unix socket 所有者失败：%w", err)
+		}
+		if err := os.Chmod(addr, 0o600); err != nil {
+			_ = l.Close()
+			return fmt.Errorf("设置 unix socket 权限失败：%w", err)
+		}
+	} else if err := os.Chmod(addr, 0o600); err != nil {
+		_ = l.Close()
+		return fmt.Errorf("设置 unix socket 权限失败：%w", err)
+	}
 	log.Printf("unix 监听地址: %s", l.Addr().String())
 
 	server := &http.Server{
@@ -130,7 +147,12 @@ func StartUnix(addr string) error {
 }
 
 func StartPipe(addr string) error {
-	l, err := listen.ListenNamedPipe(addr)
+	pipeSDDL := ""
+	if sid, ok := GetKeyManager().GetAuthorizedSID(); ok {
+		pipeSDDL = fmt.Sprintf("D:PAI(A;OICI;GWGR;;;%s)(A;OICI;GWGR;;;SY)", sid)
+	}
+
+	l, err := listen.ListenNamedPipe(addr, pipeSDDL)
 	if err != nil {
 		return fmt.Errorf("pipe 监听错误：%w", err)
 	}

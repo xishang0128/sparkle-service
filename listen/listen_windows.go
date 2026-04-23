@@ -11,14 +11,16 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// windowsSDDL is the Security Descriptor set on the namedpipe.
+// DefaultNamedPipeSDDL is the default Security Descriptor set on the namedpipe.
 // It provides read/write access to all users and the local system.
-const windowsSDDL = "D:PAI(A;OICI;GWGR;;;BU)(A;OICI;GWGR;;;SY)"
+const DefaultNamedPipeSDDL = "D:PAI(A;OICI;GWGR;;;BU)(A;OICI;GWGR;;;SY)"
 
-func ListenNamedPipe(path string) (net.Listener, error) {
-	sddl := os.Getenv("LISTEN_NAMEDPIPE_SDDL")
+func ListenNamedPipe(path string, sddl string) (net.Listener, error) {
+	if override := os.Getenv("LISTEN_NAMEDPIPE_SDDL"); override != "" {
+		sddl = override
+	}
 	if sddl == "" {
-		sddl = windowsSDDL
+		sddl = DefaultNamedPipeSDDL
 	}
 	securityDescriptor, err := windows.SecurityDescriptorFromString(sddl)
 	if err != nil {

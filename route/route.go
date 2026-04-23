@@ -13,14 +13,14 @@ func router() *chi.Mux {
 
 	r.Group(func(r chi.Router) {
 		r.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
-			sendJSON(w, "", "pong")
+			sendJSON(w, "success", "pong")
 		})
 	})
 
 	r.Group(func(r chi.Router) {
 		r.Use(AuthMiddleware)
 		r.Get("/test", func(w http.ResponseWriter, r *http.Request) {
-			sendJSON(w, "", "auth success")
+			sendJSON(w, "success", "auth success")
 		})
 		r.Mount("/service", serviceRouter())
 		r.Mount("/sysproxy", httpProxyRouter())

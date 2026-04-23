@@ -7,6 +7,7 @@ import (
 	"os"
 )
 
-func ListenNamedPipe(path string) (net.Listener, error) {
+func ListenNamedPipe(path string, sddl string) (net.Listener, error) {
+	_, _ = path, sddl
 	return nil, os.ErrInvalid
 }

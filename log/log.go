@@ -6,10 +6,35 @@ import (
 	"path/filepath"
 )
 
+func currentLogPath() string {
+	return filepath.Join(os.TempDir(), "sparkle-service.log")
+}
+
+func previousLogPath() string {
+	return filepath.Join(os.TempDir(), "sparkle-service.previous.log")
+}
+
+func rotateLogFiles() error {
+	currentPath := currentLogPath()
+	previousPath := previousLogPath()
+
+	if err := os.Remove(previousPath); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	if err := os.Rename(currentPath, previousPath); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	return nil
+}
+
 func InitLogging() (*os.File, error) {
-	tmpDir := os.TempDir()
-	logPath := filepath.Join(tmpDir, "sparkle-service.log")
-	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err := rotateLogFiles(); err != nil {
+		return nil, err
+	}
+
+	logFile, err := os.OpenFile(currentLogPath(), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		return nil, err
 	}

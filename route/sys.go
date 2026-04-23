@@ -1,6 +1,7 @@
 package route
 
 import (
+	"fmt"
 	"net/http"
 	"sparkle-service/sys"
 
@@ -18,7 +19,7 @@ func sysRouter() http.Handler {
 func setDns(w http.ResponseWriter, r *http.Request) {
 	var req Request
 	if err := decodeRequest(r, &req); err != nil {
-		sendError(w, err)
+		sendError(w, badRequestError(fmt.Sprintf("无效的请求体: %v", err)))
 		return
 	}
 	if err := sys.SetDns(req.Device, req.Servers); err != nil {

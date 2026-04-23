@@ -25,7 +25,9 @@ func (p *Program) run() {
 	if err != nil {
 		log.Printf("初始化日志失败：%v\n", err)
 	}
-	defer logFile.Close()
+	if logFile != nil {
+		defer logFile.Close()
+	}
 	log.Println("服务启动中...")
 
 	if err := route.Start(p.listen); err != nil {
@@ -226,8 +228,14 @@ var serviceInitCmd = &cobra.Command{
 	Short: "初始化服务（传入公钥）",
 	Run: func(cmd *cobra.Command, args []string) {
 		publicKey := cmd.Flag("public-key").Value.String()
+		authorizedSID := cmd.Flag("authorized-sid").Value.String()
+		authorizedUID, _ := cmd.Flags().GetUint32("authorized-uid")
 		if publicKey == "" {
 			log.Println("错误：必须通过 --public-key 参数提供公钥")
+			return
+		}
+		if authorizedSID == "" && !cmd.Flags().Changed("authorized-uid") {
+			log.Println("错误：必须通过 --authorized-sid 或 --authorized-uid 绑定允许访问服务的用户身份")
 			return
 		}
 		userDataDir := route.GetConfigDir()
@@ -236,12 +244,33 @@ var serviceInitCmd = &cobra.Command{
 		_ = route.InitKeyManager(keyDir)
 
 		km := route.GetKeyManager()
-		if err := km.SetPublicKey(publicKey); err != nil {
+		keyChanged, err := km.SetPublicKey(publicKey)
+		if err != nil {
 			log.Println("设置公钥失败：", err)
 			return
 		}
 
-		log.Println("服务初始化成功，公钥已保存")
+		principalChanged := false
+		switch {
+		case authorizedSID != "":
+			principalChanged, err = km.SetAuthorizedSID(authorizedSID)
+			if err != nil {
+				log.Println("设置授权 SID 失败：", err)
+				return
+			}
+		case cmd.Flags().Changed("authorized-uid"):
+			principalChanged, err = km.SetAuthorizedUID(authorizedUID)
+			if err != nil {
+				log.Println("设置授权 UID 失败：", err)
+				return
+			}
+		}
+
+		if keyChanged || principalChanged {
+			log.Println("服务初始化成功，认证配置已更新")
+		} else {
+			log.Println("服务初始化成功，认证配置未变化")
+		}
 
 		listenAddr := listen
 		if listenAddr == "" {
@@ -262,6 +291,10 @@ var serviceInitCmd = &cobra.Command{
 		}
 
 		if status == kservice.StatusRunning {
+			if !keyChanged && !principalChanged {
+				log.Println("服务已在运行，配置未变化，无需重启")
+				return
+			}
 			log.Println("正在重启服务...")
 			if err := s.Restart(); err != nil {
 				log.Println("重启服务失败：", err)
@@ -286,4 +319,6 @@ func init() {
 	serviceCmd.AddCommand(serviceRunCmd)
 
 	serviceInitCmd.Flags().StringP("public-key", "k", "", "客户端公钥")
+	serviceInitCmd.Flags().String("authorized-sid", "", "允许访问服务的 Windows SID")
+	serviceInitCmd.Flags().Uint32("authorized-uid", 0, "允许访问服务的 Unix UID")
 }
