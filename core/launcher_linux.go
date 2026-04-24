@@ -15,6 +15,10 @@ import (
 
 const disableLinuxSandboxEnv = "SPARKLE_CORE_DISABLE_LINUX_SANDBOX"
 
+const linuxSandboxCloneFlags = syscall.CLONE_NEWNS |
+	syscall.CLONE_NEWIPC |
+	syscall.CLONE_NEWUTS
+
 type linuxSandboxLauncher struct{}
 
 type linuxSandboxMount struct {
@@ -52,10 +56,7 @@ func (linuxSandboxLauncher) Command(launch *launchSession) (*exec.Cmd, error) {
 		cmd.SysProcAttr = &syscall.SysProcAttr{}
 	}
 	cmd.SysProcAttr.Chroot = root
-	cmd.SysProcAttr.Cloneflags |= syscall.CLONE_NEWNS |
-		syscall.CLONE_NEWPID |
-		syscall.CLONE_NEWIPC |
-		syscall.CLONE_NEWUTS
+	cmd.SysProcAttr.Cloneflags |= linuxSandboxCloneFlags
 	cmd.SysProcAttr.Pdeathsig = syscall.SIGKILL
 
 	return cmd, nil
