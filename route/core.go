@@ -25,6 +25,12 @@ func coreManagerRouter() http.Handler {
 	r.Use(requestLogger)
 
 	r.Get("/", coreStatus)
+	r.Get("/events", coreEvents)
+	r.HandleFunc("/controller", coreControllerProxy)
+	r.HandleFunc("/controller/*", coreControllerProxy)
+	r.Get("/profile", coreProfile)
+	r.Post("/profile", coreSaveProfile)
+	r.Patch("/profile", corePatchProfile)
 	r.Post("/start", coreStart)
 	r.Post("/stop", coreStop)
 	r.Post("/restart", coreRestart)
@@ -41,12 +47,72 @@ func coreStatus(w http.ResponseWriter, r *http.Request) {
 	render.JSON(w, r, status)
 }
 
-func coreStart(w http.ResponseWriter, r *http.Request) {
-	if err := cm.StartCore(); err != nil {
+func coreProfile(w http.ResponseWriter, r *http.Request) {
+	profile, err := core.LoadLaunchProfile()
+	if err != nil {
 		sendError(w, err)
 		return
 	}
-	sendJSON(w, "success", "核心启动成功")
+	render.JSON(w, r, profile)
+}
+
+func coreSaveProfile(w http.ResponseWriter, r *http.Request) {
+	var profile core.LaunchProfile
+	if err := decodeRequest(r, &profile); err != nil {
+		sendError(w, badRequestError(err.Error()))
+		return
+	}
+
+	if err := core.SaveLaunchProfile(profile); err != nil {
+		sendError(w, badRequestError(err.Error()))
+		return
+	}
+	normalized, err := core.LoadLaunchProfile()
+	if err != nil {
+		sendError(w, badRequestError(err.Error()))
+		return
+	}
+	cm.ApplyLaunchProfile(normalized)
+
+	sendJSON(w, "success", "核心启动配置已更新")
+}
+
+func corePatchProfile(w http.ResponseWriter, r *http.Request) {
+	var patch core.LaunchProfilePatch
+	if err := decodeRequest(r, &patch); err != nil {
+		sendError(w, badRequestError(err.Error()))
+		return
+	}
+
+	profile, err := core.PatchLaunchProfile(patch)
+	if err != nil {
+		sendError(w, badRequestError(err.Error()))
+		return
+	}
+	cm.ApplyLaunchProfile(profile)
+
+	sendJSON(w, "success", "核心启动配置已更新")
+}
+
+func coreStart(w http.ResponseWriter, r *http.Request) {
+	profile, hasProfile, err := decodeOptionalLaunchProfile(r)
+	if err != nil {
+		sendError(w, badRequestError(err.Error()))
+		return
+	}
+	if hasProfile {
+		if err := core.SaveLaunchProfile(*profile); err != nil {
+			sendError(w, badRequestError(err.Error()))
+			return
+		}
+	}
+
+	if err := cm.StartCoreWithProfile(profile); err != nil {
+		sendError(w, err)
+		return
+	}
+
+	sendCoreReady(w, r, "核心启动成功")
 }
 
 func coreStop(w http.ResponseWriter, r *http.Request) {
@@ -58,9 +124,47 @@ func coreStop(w http.ResponseWriter, r *http.Request) {
 }
 
 func coreRestart(w http.ResponseWriter, r *http.Request) {
-	if err := cm.RestartCore(); err != nil {
+	profile, hasProfile, err := decodeOptionalLaunchProfile(r)
+	if err != nil {
+		sendError(w, badRequestError(err.Error()))
+		return
+	}
+	if hasProfile {
+		if err := core.SaveLaunchProfile(*profile); err != nil {
+			sendError(w, badRequestError(err.Error()))
+			return
+		}
+	}
+
+	if err := cm.RestartCoreWithProfile(profile); err != nil {
 		sendError(w, err)
 		return
 	}
-	sendJSON(w, "success", "核心重启成功")
+	sendCoreReady(w, r, "核心重启成功")
+}
+
+func decodeOptionalLaunchProfile(r *http.Request) (*core.LaunchProfile, bool, error) {
+	var profile core.LaunchProfile
+	ok, err := decodeOptionalRequest(r, &profile)
+	if err != nil {
+		return nil, false, err
+	}
+	if !ok {
+		return nil, false, nil
+	}
+	return &profile, true, nil
+}
+
+func sendCoreReady(w http.ResponseWriter, r *http.Request, message string) {
+	status, err := cm.GetProcessInfo()
+	if err != nil {
+		sendJSON(w, "success", message)
+		return
+	}
+
+	render.JSON(w, r, map[string]any{
+		"status":  "success",
+		"message": message,
+		"core":    status,
+	})
 }

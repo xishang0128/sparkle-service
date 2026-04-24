@@ -3,6 +3,7 @@ package route
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 
 	"github.com/go-chi/render"
@@ -62,10 +63,21 @@ func serviceUnavailableError(message string) error {
 }
 
 func decodeRequest(r *http.Request, v any) error {
-	if r.ContentLength > 0 {
-		return render.DecodeJSON(r.Body, v)
+	_, err := decodeOptionalRequest(r, v)
+	return err
+}
+
+func decodeOptionalRequest(r *http.Request, v any) (bool, error) {
+	if r.Body == nil || r.Body == http.NoBody || r.ContentLength == 0 {
+		return false, nil
 	}
-	return nil
+	if err := render.DecodeJSON(r.Body, v); err != nil {
+		if errors.Is(err, io.EOF) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }
 
 func requestLogger(next http.Handler) http.Handler {

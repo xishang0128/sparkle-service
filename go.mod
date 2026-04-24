@@ -10,7 +10,6 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/xishang0128/sysproxy-go v0.0.0-20260420011251-6563f6b60b67
 	golang.org/x/sys v0.43.0
-	golang.org/x/text v0.36.0
 )
 
 require (
