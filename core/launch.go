@@ -166,10 +166,19 @@ func (cm *CoreManager) prepareLaunchSession(profileOverride *LaunchProfile) (*la
 	}
 	args = append([]string{"-post-up", hook.postUpCommand, "-post-down", hook.postDownCommand}, args...)
 
+	workingDir, err := resolveLaunchWorkingDir(corePath, args)
+	if err != nil {
+		hook.cleanup()
+		if controllerCleanup != nil {
+			controllerCleanup()
+		}
+		return nil, err
+	}
+
 	return &launchSession{
 		sourcePath:     corePath,
 		executablePath: corePath,
-		workingDir:     filepath.Dir(corePath),
+		workingDir:     workingDir,
 		args:           args,
 		env:            buildLaunchEnv(profile),
 		hookUpFile:     hook.upFile,
@@ -288,6 +297,37 @@ func validateCoreArgs(args []string) error {
 		}
 	}
 	return nil
+}
+
+func resolveLaunchWorkingDir(corePath string, args []string) (string, error) {
+	workingDir := filepath.Dir(corePath)
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		switch arg {
+		case "-d":
+			if i+1 < len(args) {
+				workingDir = args[i+1]
+				i++
+			}
+		default:
+			if after, ok := strings.CutPrefix(arg, "-d="); ok {
+				workingDir = after
+			}
+		}
+	}
+
+	workingDir = strings.TrimSpace(workingDir)
+	if workingDir == "" {
+		return "", fmt.Errorf("核心工作目录不能为空")
+	}
+	if !filepath.IsAbs(workingDir) {
+		absPath, err := filepath.Abs(workingDir)
+		if err != nil {
+			return "", fmt.Errorf("解析核心工作目录失败 %q：%w", workingDir, err)
+		}
+		workingDir = absPath
+	}
+	return filepath.Clean(workingDir), nil
 }
 
 func configureManagedController(args []string) ([]string, string, string, func(), error) {

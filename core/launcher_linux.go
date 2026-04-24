@@ -16,9 +16,10 @@ import (
 
 const disableLinuxSandboxEnv = "SPARKLE_CORE_DISABLE_LINUX_SANDBOX"
 
-const linuxSandboxCloneFlags = syscall.CLONE_NEWNS |
-	syscall.CLONE_NEWIPC |
+const linuxSandboxCloneFlags = syscall.CLONE_NEWIPC |
 	syscall.CLONE_NEWUTS
+
+const linuxSandboxUnshareFlags = syscall.CLONE_NEWNS
 
 type linuxSandboxLauncher struct{}
 
@@ -58,6 +59,7 @@ func (linuxSandboxLauncher) Command(launch *launchSession) (*exec.Cmd, error) {
 	}
 	cmd.SysProcAttr.Chroot = root
 	cmd.SysProcAttr.Cloneflags |= linuxSandboxCloneFlags
+	cmd.SysProcAttr.Unshareflags |= linuxSandboxUnshareFlags
 	cmd.SysProcAttr.Pdeathsig = syscall.SIGKILL
 
 	return cmd, nil
@@ -70,14 +72,18 @@ func prepareLinuxSandboxRoot(launch *launchSession) (string, func() error, error
 	if err != nil {
 		return "", nil, fmt.Errorf("创建核心沙盒目录失败：%w", err)
 	}
-	if err := prepareLinuxSandboxStaticLayout(root); err != nil {
+	if err := mountSandboxRoot(root); err != nil {
 		_ = os.RemoveAll(root)
+		return "", nil, err
+	}
+	if err := prepareLinuxSandboxStaticLayout(root); err != nil {
+		_ = cleanupLinuxSandboxRoot(root)
 		return "", nil, err
 	}
 
 	mounts, err := linuxSandboxMounts(launch)
 	if err != nil {
-		_ = os.RemoveAll(root)
+		_ = cleanupLinuxSandboxRoot(root)
 		return "", nil, err
 	}
 
@@ -85,9 +91,25 @@ func prepareLinuxSandboxRoot(launch *launchSession) (string, func() error, error
 	cleanup := func() error {
 		var cleanupErr error
 		for i := len(mounted) - 1; i >= 0; i-- {
+			if err := makeSandboxMountPrivate(mounted[i]); err != nil {
+				if cleanupErr == nil && !errors.Is(err, syscall.EINVAL) && !errors.Is(err, syscall.ENOENT) {
+					cleanupErr = fmt.Errorf("隔离沙盒映射失败 %s：%w", mounted[i], err)
+				}
+				continue
+			}
 			if err := syscall.Unmount(mounted[i], syscall.MNT_DETACH); err != nil && cleanupErr == nil {
 				cleanupErr = fmt.Errorf("卸载沙盒映射失败 %s：%w", mounted[i], err)
 			}
+		}
+		if err := makeSandboxMountPrivate(root); err != nil {
+			if cleanupErr == nil && !errors.Is(err, syscall.EINVAL) && !errors.Is(err, syscall.ENOENT) {
+				cleanupErr = fmt.Errorf("隔离核心沙盒根目录失败 %s：%w", root, err)
+			}
+		} else if err := syscall.Unmount(root, syscall.MNT_DETACH); err != nil &&
+			cleanupErr == nil &&
+			!errors.Is(err, syscall.EINVAL) &&
+			!errors.Is(err, syscall.ENOENT) {
+			cleanupErr = fmt.Errorf("卸载核心沙盒根目录失败 %s：%w", root, err)
 		}
 		if err := os.RemoveAll(root); err != nil && cleanupErr == nil {
 			cleanupErr = fmt.Errorf("清理核心沙盒目录失败：%w", err)
@@ -105,6 +127,17 @@ func prepareLinuxSandboxRoot(launch *launchSession) (string, func() error, error
 	}
 
 	return root, cleanup, nil
+}
+
+func mountSandboxRoot(root string) error {
+	if err := syscall.Mount(root, root, "", uintptr(syscall.MS_BIND), ""); err != nil {
+		return fmt.Errorf("初始化核心沙盒根目录失败 %s：%w", root, err)
+	}
+	if err := makeSandboxMountPrivate(root); err != nil {
+		_ = syscall.Unmount(root, syscall.MNT_DETACH)
+		return fmt.Errorf("隔离核心沙盒根目录失败 %s：%w", root, err)
+	}
+	return nil
 }
 
 func prepareLinuxSandboxStaticLayout(root string) error {
@@ -155,6 +188,14 @@ func cleanupLinuxSandboxRoot(root string) error {
 
 	var cleanupErr error
 	for _, mountPoint := range linuxMountPointsUnder(root) {
+		if err := makeSandboxMountPrivate(mountPoint); err != nil {
+			if !errors.Is(err, syscall.EINVAL) &&
+				!errors.Is(err, syscall.ENOENT) &&
+				cleanupErr == nil {
+				cleanupErr = fmt.Errorf("隔离残留核心沙盒映射失败 %s：%w", mountPoint, err)
+			}
+			continue
+		}
 		if err := syscall.Unmount(mountPoint, syscall.MNT_DETACH); err != nil &&
 			!errors.Is(err, syscall.EINVAL) &&
 			!errors.Is(err, syscall.ENOENT) &&
@@ -217,13 +258,7 @@ func pathWithin(path string, root string) bool {
 
 func mountIntoSandbox(target string, mount linuxSandboxMount) error {
 	if mount.proc {
-		if err := os.MkdirAll(target, 0o555); err != nil {
-			return err
-		}
-		if err := syscall.Mount("proc", target, "proc", uintptr(syscall.MS_NOSUID|syscall.MS_NOEXEC|syscall.MS_NODEV), ""); err != nil {
-			return fmt.Errorf("挂载 /proc 失败：%w", err)
-		}
-		return nil
+		return mountKernelFilesystem(target, "proc", uintptr(syscall.MS_NOSUID|syscall.MS_NOEXEC|syscall.MS_NODEV))
 	}
 
 	if mount.file {
@@ -243,6 +278,10 @@ func mountIntoSandbox(target string, mount linuxSandboxMount) error {
 	if err := syscall.Mount(mount.source, target, "", flags, ""); err != nil {
 		return fmt.Errorf("映射沙盒路径失败 %s -> %s：%w", mount.source, mount.target, err)
 	}
+	if err := makeSandboxMountPrivate(target); err != nil {
+		_ = syscall.Unmount(target, syscall.MNT_DETACH)
+		return fmt.Errorf("隔离沙盒映射失败 %s：%w", mount.target, err)
+	}
 
 	if mount.readOnly {
 		flags |= syscall.MS_REMOUNT | syscall.MS_RDONLY
@@ -252,6 +291,28 @@ func mountIntoSandbox(target string, mount linuxSandboxMount) error {
 		}
 	}
 
+	return nil
+}
+
+func makeSandboxMountPrivate(target string) error {
+	err := syscall.Mount("", target, "", uintptr(syscall.MS_PRIVATE|syscall.MS_REC), "")
+	if errors.Is(err, syscall.EINVAL) {
+		return syscall.Mount("", target, "", uintptr(syscall.MS_PRIVATE), "")
+	}
+	return err
+}
+
+func mountKernelFilesystem(target string, fsType string, flags uintptr) error {
+	if err := os.MkdirAll(target, 0o555); err != nil {
+		return err
+	}
+	if err := syscall.Mount(fsType, target, fsType, flags, ""); err != nil {
+		return fmt.Errorf("挂载 %s 失败：%w", target, err)
+	}
+	if err := makeSandboxMountPrivate(target); err != nil {
+		_ = syscall.Unmount(target, syscall.MNT_DETACH)
+		return fmt.Errorf("隔离沙盒映射失败 %s：%w", target, err)
+	}
 	return nil
 }
 
@@ -287,16 +348,9 @@ func linuxSandboxMounts(launch *launchSession) ([]linuxSandboxMount, error) {
 		return addMount(dir, readOnly, false)
 	}
 	addWritableDir := func(path string) error {
-		path, err := normalizeSandboxPath(path)
+		path, err := writableSandboxDir(path)
 		if err != nil {
 			return err
-		}
-		info, err := os.Stat(path)
-		if err != nil {
-			return err
-		}
-		if !info.IsDir() {
-			path = filepath.Dir(path)
 		}
 		return addMount(path, false, false)
 	}
@@ -312,7 +366,11 @@ func linuxSandboxMounts(launch *launchSession) ([]linuxSandboxMount, error) {
 		}
 	}
 
-	if err := addDirForPath(launch.executablePath, true); err != nil {
+	coreDir, err := sandboxDirForPath(launch.executablePath)
+	if err != nil {
+		return nil, err
+	}
+	if err := addMount(coreDir, false, false); err != nil {
 		return nil, err
 	}
 	if executable, err := os.Executable(); err == nil {
@@ -323,8 +381,14 @@ func linuxSandboxMounts(launch *launchSession) ([]linuxSandboxMount, error) {
 		return nil, fmt.Errorf("读取 service 可执行文件路径失败：%w", err)
 	}
 
-	if err := addWritableDir(launch.workingDir); err != nil {
+	workingDir, err := sandboxDirForPath(launch.workingDir)
+	if err != nil {
 		return nil, err
+	}
+	if workingDir != coreDir {
+		if err := addMount(workingDir, true, false); err != nil {
+			return nil, err
+		}
 	}
 	if launch.logPath != "" {
 		logDir := filepath.Dir(launch.logPath)
@@ -416,6 +480,24 @@ func writableDirsFromCoreArgs(args []string) []string {
 		dirs = append(dirs, value)
 	}
 	return dirs
+}
+
+func writableSandboxDir(path string) (string, error) {
+	path, err := normalizeSandboxPath(path)
+	if err != nil {
+		return "", err
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		return "", err
+	}
+	if !info.IsDir() {
+		path = filepath.Dir(path)
+	}
+	path = filepath.Clean(path)
+
+	return path, nil
 }
 
 func sandboxDirForPath(path string) (string, error) {
