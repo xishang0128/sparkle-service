@@ -1,6 +1,7 @@
 package route
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -8,6 +9,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sparkle-service/log"
+	"sync"
 	"syscall"
 
 	"sparkle-service/listen"
@@ -16,6 +18,7 @@ import (
 var (
 	unixServer *http.Server
 	pipeServer *http.Server
+	serverMu   sync.Mutex
 )
 
 func GetConfigDir() string {
@@ -54,28 +57,32 @@ func Start(addr string) error {
 		log.Println("警告：请求方身份绑定未启用")
 	}
 
+	var err error
 	if runtime.GOOS == "windows" {
-		if err := startServer(addr, StartPipe); err != nil {
-			return err
-		}
+		err = startServer(addr, StartPipe)
 	} else {
-		if err := startServer(addr, StartUnix); err != nil {
-			return err
-		}
+		err = startServer(addr, StartUnix)
 	}
+	if errors.Is(err, http.ErrServerClosed) {
+		return nil
+	}
+	return err
+}
 
-	return nil
+func Stop() error {
+	var errs []error
+	if err := stopCoreManager(); err != nil {
+		errs = append(errs, fmt.Errorf("停止核心失败：%w", err))
+	}
+	if err := closeServers(); err != nil {
+		errs = append(errs, err)
+	}
+	return errors.Join(errs...)
 }
 
 func startServer(addr string, startFunc func(string) error) error {
-	if unixServer != nil {
-		_ = unixServer.Close()
-		unixServer = nil
-	}
-
-	if pipeServer != nil {
-		_ = pipeServer.Close()
-		pipeServer = nil
+	if err := closeServers(); err != nil {
+		return err
 	}
 
 	if len(addr) > 0 {
@@ -95,6 +102,25 @@ func startServer(addr string, startFunc func(string) error) error {
 		}
 	}
 	return nil
+}
+
+func closeServers() error {
+	serverMu.Lock()
+	servers := []*http.Server{unixServer, pipeServer}
+	unixServer = nil
+	pipeServer = nil
+	serverMu.Unlock()
+
+	var errs []error
+	for _, server := range servers {
+		if server == nil {
+			continue
+		}
+		if err := server.Close(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			errs = append(errs, fmt.Errorf("关闭服务监听失败：%w", err))
+		}
+	}
+	return errors.Join(errs...)
 }
 
 func ensureDirExists(dir string) error {
@@ -142,7 +168,9 @@ func StartUnix(addr string) error {
 		Handler: router(),
 	}
 	configurePipeServer(server)
+	serverMu.Lock()
 	unixServer = server
+	serverMu.Unlock()
 	return server.Serve(l)
 }
 
@@ -162,6 +190,8 @@ func StartPipe(addr string) error {
 		Handler: router(),
 	}
 	configurePipeServer(server)
+	serverMu.Lock()
 	pipeServer = server
+	serverMu.Unlock()
 	return server.Serve(l)
 }

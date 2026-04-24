@@ -38,6 +38,13 @@ func coreManagerRouter() http.Handler {
 	return r
 }
 
+func stopCoreManager() error {
+	if !isInit.Load() || cm == nil {
+		return nil
+	}
+	return cm.StopCore()
+}
+
 func coreStatus(w http.ResponseWriter, r *http.Request) {
 	status, err := cm.GetProcessInfo()
 	if err != nil {

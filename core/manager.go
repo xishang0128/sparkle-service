@@ -290,11 +290,11 @@ func (cm *CoreManager) StopCore() error {
 	cm.monitoring.Store(false)
 	cm.signalStopLocked()
 
-	if err := cm.stopProcessLocked(); err != nil {
-		return err
-	}
-
+	stopErr := cm.stopProcessLocked()
 	cm.cleanupLocked()
+	if stopErr != nil {
+		return stopErr
+	}
 	cm.emitCoreEvent(CoreEventStopped, "核心已停止", nil)
 	return nil
 }

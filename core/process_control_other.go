@@ -4,7 +4,6 @@ package core
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
 	"syscall"
 )
@@ -54,15 +53,17 @@ func (c *noopProcessController) Stop(pid int32) error {
 		return nil
 	}
 
-	_ = syscall.Kill(-int(pid), syscall.SIGTERM)
-	_ = syscall.Kill(-int(pid), syscall.SIGKILL)
-
-	proc, err := os.FindProcess(int(pid))
-	if err != nil {
-		return err
+	var stopErr error
+	if err := syscall.Kill(-int(pid), syscall.SIGTERM); err != nil && err != syscall.ESRCH {
+		stopErr = err
 	}
-
-	return proc.Kill()
+	if err := syscall.Kill(-int(pid), syscall.SIGKILL); err != nil && err != syscall.ESRCH && stopErr == nil {
+		stopErr = err
+	}
+	if err := syscall.Kill(int(pid), syscall.SIGKILL); err != nil && err != syscall.ESRCH && stopErr == nil {
+		stopErr = err
+	}
+	return stopErr
 }
 
 func (c *noopProcessController) Close() error {

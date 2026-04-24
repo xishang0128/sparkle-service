@@ -37,6 +37,11 @@ func (p *Program) run() {
 
 func (p *Program) Stop(s kservice.Service) error {
 	log.Println("服务停止中...")
+	if err := route.Stop(); err != nil {
+		log.Printf("服务停止清理失败：%v", err)
+		return err
+	}
+	log.Println("服务已停止")
 	return nil
 }
 
@@ -202,6 +207,10 @@ var serviceRunCmd = &cobra.Command{
 	Use:   "run",
 	Short: "运行 Sparkle 服务",
 	Run: func(cmd *cobra.Command, args []string) {
+		if err := ensureServiceRuntimeExecutable(); err != nil {
+			log.Fatal(err)
+		}
+
 		listenAddr := listen
 		if listenAddr == "" {
 			listenAddr = defaultAddr

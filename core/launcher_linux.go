@@ -3,6 +3,7 @@
 package core
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -63,6 +64,8 @@ func (linuxSandboxLauncher) Command(launch *launchSession) (*exec.Cmd, error) {
 }
 
 func prepareLinuxSandboxRoot(launch *launchSession) (string, func() error, error) {
+	cleanupStaleLinuxSandboxRoots()
+
 	root, err := os.MkdirTemp("", "sparkle-core-sandbox-*")
 	if err != nil {
 		return "", nil, fmt.Errorf("创建核心沙盒目录失败：%w", err)
@@ -124,6 +127,94 @@ func prepareLinuxSandboxStaticLayout(root string) error {
 	return nil
 }
 
+func cleanupStaleLinuxSandboxRoots() {
+	roots, err := filepath.Glob(filepath.Join(os.TempDir(), "sparkle-core-sandbox-*"))
+	if err != nil {
+		logSandboxCleanupError(fmt.Errorf("查找残留核心沙盒目录失败：%w", err))
+		return
+	}
+
+	for _, root := range roots {
+		if err := cleanupLinuxSandboxRoot(root); err != nil {
+			logSandboxCleanupError(err)
+		}
+	}
+}
+
+func cleanupLinuxSandboxRoot(root string) error {
+	info, err := os.Lstat(root)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("读取残留核心沙盒目录失败 %s：%w", root, err)
+	}
+	if !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		return nil
+	}
+
+	var cleanupErr error
+	for _, mountPoint := range linuxMountPointsUnder(root) {
+		if err := syscall.Unmount(mountPoint, syscall.MNT_DETACH); err != nil &&
+			!errors.Is(err, syscall.EINVAL) &&
+			!errors.Is(err, syscall.ENOENT) &&
+			cleanupErr == nil {
+			cleanupErr = fmt.Errorf("卸载残留核心沙盒映射失败 %s：%w", mountPoint, err)
+		}
+	}
+	if err := os.RemoveAll(root); err != nil && cleanupErr == nil {
+		cleanupErr = fmt.Errorf("清理残留核心沙盒目录失败 %s：%w", root, err)
+	}
+	return cleanupErr
+}
+
+func linuxMountPointsUnder(root string) []string {
+	root = filepath.Clean(root)
+	data, err := os.ReadFile("/proc/self/mountinfo")
+	if err != nil {
+		return nil
+	}
+
+	var mountPoints []string
+	for _, line := range strings.Split(string(data), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 5 {
+			continue
+		}
+
+		mountPoint := filepath.Clean(unescapeMountInfoPath(fields[4]))
+		if pathWithin(mountPoint, root) {
+			mountPoints = append(mountPoints, mountPoint)
+		}
+	}
+
+	slices.SortFunc(mountPoints, func(a, b string) int {
+		return strings.Count(b, string(os.PathSeparator)) - strings.Count(a, string(os.PathSeparator))
+	})
+	return mountPoints
+}
+
+func unescapeMountInfoPath(path string) string {
+	replacer := strings.NewReplacer(
+		`\040`, " ",
+		`\011`, "\t",
+		`\012`, "\n",
+		`\134`, `\`,
+	)
+	return replacer.Replace(path)
+}
+
+func pathWithin(path string, root string) bool {
+	if path == root {
+		return true
+	}
+	rel, err := filepath.Rel(root, path)
+	if err != nil {
+		return false
+	}
+	return rel != ".." && !strings.HasPrefix(rel, ".."+string(os.PathSeparator))
+}
+
 func mountIntoSandbox(target string, mount linuxSandboxMount) error {
 	if mount.proc {
 		if err := os.MkdirAll(target, 0o555); err != nil {
@@ -156,6 +247,7 @@ func mountIntoSandbox(target string, mount linuxSandboxMount) error {
 	if mount.readOnly {
 		flags |= syscall.MS_REMOUNT | syscall.MS_RDONLY
 		if err := syscall.Mount(mount.source, target, "", flags, ""); err != nil {
+			_ = syscall.Unmount(target, syscall.MNT_DETACH)
 			return fmt.Errorf("设置沙盒只读映射失败 %s：%w", mount.target, err)
 		}
 	}
