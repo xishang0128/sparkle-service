@@ -16,7 +16,7 @@ var (
 
 func coreManagerRouter() http.Handler {
 	if !isInit.Load() {
-		cm = core.NewCoreManager()
+		cm = core.NewCoreManager(core.WithTrafficMonitorPipeSDDL(trafficMonitorPipeSDDL()))
 		isInit.Store(true)
 	}
 
@@ -36,6 +36,13 @@ func coreManagerRouter() http.Handler {
 	r.Post("/restart", coreRestart)
 
 	return r
+}
+
+func trafficMonitorPipeSDDL() string {
+	if sid, ok := GetKeyManager().GetAuthorizedSID(); ok {
+		return "D:PAI(A;OICI;GWGR;;;" + sid + ")(A;OICI;GWGR;;;SY)"
+	}
+	return ""
 }
 
 func stopCoreManager() error {

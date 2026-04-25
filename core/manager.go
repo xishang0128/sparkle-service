@@ -33,17 +33,18 @@ type processController interface {
 }
 
 type CoreManager struct {
-	cmd        *exec.Cmd
-	controller processController
-	launch     *launchSession
-	eventHub   coreEventHub
-	isRunning  atomic.Bool
-	monitoring atomic.Bool
-	pidPolling atomic.Bool
-	startTime  time.Time
-	pid        atomic.Int32
-	mutex      sync.Mutex
-	stopChan   chan struct{}
+	cmd                    *exec.Cmd
+	controller             processController
+	launch                 *launchSession
+	eventHub               coreEventHub
+	isRunning              atomic.Bool
+	monitoring             atomic.Bool
+	pidPolling             atomic.Bool
+	startTime              time.Time
+	pid                    atomic.Int32
+	mutex                  sync.Mutex
+	stopChan               chan struct{}
+	trafficMonitorPipeSDDL string
 }
 
 type boundedOutputBuffer struct {
@@ -149,8 +150,22 @@ type ProcessInfo struct {
 	Executable   string    `json:"executable,omitempty"`
 }
 
-func NewCoreManager() *CoreManager {
-	return &CoreManager{}
+type CoreManagerOption func(*CoreManager)
+
+func WithTrafficMonitorPipeSDDL(sddl string) CoreManagerOption {
+	return func(cm *CoreManager) {
+		cm.trafficMonitorPipeSDDL = sddl
+	}
+}
+
+func NewCoreManager(options ...CoreManagerOption) *CoreManager {
+	cm := &CoreManager{}
+	for _, option := range options {
+		if option != nil {
+			option(cm)
+		}
+	}
+	return cm
 }
 
 func (cm *CoreManager) StartCore() error {
@@ -267,6 +282,11 @@ func (cm *CoreManager) startProcessLocked(profile *LaunchProfile) error {
 		cm.cleanupLocked()
 		cm.emitCoreEvent(CoreEventFailed, "核心启动失败", err)
 		return err
+	}
+	if cleanup, err := startTrafficMonitorProxy(launch, cm.trafficMonitorPipeSDDL); err != nil {
+		log.Printf("启动 TrafficMonitor 兼容 pipe 失败: %v", err)
+	} else {
+		launch.addCleanup(cleanup)
 	}
 	cm.monitoring.Store(true)
 	go cm.monitorProcess(cmd, errBuffer, processDone)
