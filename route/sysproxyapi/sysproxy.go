@@ -26,6 +26,7 @@ type proxyRequest struct {
 func Router() http.Handler {
 	r := chi.NewRouter()
 	r.Get("/status", status)
+	r.Get("/events", sysproxyEvents)
 	r.Post("/pac", pac)
 	r.Post("/proxy", proxy)
 	r.Post("/disable", disable)
