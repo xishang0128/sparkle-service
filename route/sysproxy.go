@@ -55,7 +55,10 @@ func pac(w http.ResponseWriter, r *http.Request) {
 		UseRegistry:      req.UseRegistry,
 	})
 	err := runSysproxyAsRequestUser(r, func() error {
-		return sysproxy.SetPac(opts)
+		if err := sysproxy.SetPac(opts); err != nil {
+			return err
+		}
+		return configureSysproxyGuard(r, req.Guard, sysproxyGuardModePAC, opts)
 	})
 	log.Println("设置 PAC 耗时：", time.Since(t), "\nURL:", req.Url)
 	if err != nil {
@@ -81,7 +84,10 @@ func proxy(w http.ResponseWriter, r *http.Request) {
 		UseRegistry:      req.UseRegistry,
 	})
 	err := runSysproxyAsRequestUser(r, func() error {
-		return sysproxy.SetProxy(opts)
+		if err := sysproxy.SetProxy(opts); err != nil {
+			return err
+		}
+		return configureSysproxyGuard(r, req.Guard, sysproxyGuardModeProxy, opts)
 	})
 	log.Println("设置代理耗时：", time.Since(t), "\nserver:", req.Server, "\nbypass:", req.Bypass)
 	if err != nil {
@@ -105,7 +111,11 @@ func disable(w http.ResponseWriter, r *http.Request) {
 		UseRegistry:      req.UseRegistry,
 	})
 	err := runSysproxyAsRequestUser(r, func() error {
-		return sysproxy.DisableProxy(opts)
+		if err := sysproxy.DisableProxy(opts); err != nil {
+			return err
+		}
+		stopSysproxyGuard()
+		return nil
 	})
 	log.Println("禁用代理耗时：", time.Since(t))
 	if err != nil {

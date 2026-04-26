@@ -17,6 +17,7 @@ type Request struct {
 	Device           string `json:"device,omitempty"`
 	OnlyActiveDevice bool   `json:"only_active_device,omitempty"`
 	UseRegistry      bool   `json:"use_registry,omitempty"`
+	Guard            bool   `json:"guard,omitempty"`
 
 	Servers []string `json:"servers,omitempty"`
 }

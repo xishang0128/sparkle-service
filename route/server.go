@@ -71,6 +71,7 @@ func Start(addr string) error {
 
 func Stop() error {
 	var errs []error
+	stopSysproxyGuard()
 	if err := stopCoreManager(); err != nil {
 		errs = append(errs, fmt.Errorf("停止核心失败：%w", err))
 	}
