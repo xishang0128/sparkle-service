@@ -2,6 +2,12 @@ package route
 
 import (
 	"net/http"
+	"sparkle-service/route/auth"
+	"sparkle-service/route/coreapi"
+	"sparkle-service/route/httphelper"
+	"sparkle-service/route/serviceapi"
+	"sparkle-service/route/sysapi"
+	"sparkle-service/route/sysproxyapi"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
@@ -13,19 +19,19 @@ func router() *chi.Mux {
 
 	r.Group(func(r chi.Router) {
 		r.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
-			sendJSON(w, "success", "pong")
+			httphelper.SendJSON(w, "success", "pong")
 		})
 	})
 
 	r.Group(func(r chi.Router) {
-		r.Use(AuthMiddleware)
+		r.Use(auth.AuthMiddleware)
 		r.Get("/test", func(w http.ResponseWriter, r *http.Request) {
-			sendJSON(w, "success", "auth success")
+			httphelper.SendJSON(w, "success", "auth success")
 		})
-		r.Mount("/service", serviceRouter())
-		r.Mount("/sysproxy", httpProxyRouter())
-		r.Mount("/core", coreManagerRouter())
-		r.Mount("/sys", sysRouter())
+		r.Mount("/service", serviceapi.Router())
+		r.Mount("/sysproxy", sysproxyapi.Router())
+		r.Mount("/core", coreapi.Router())
+		r.Mount("/sys", sysapi.Router())
 	})
 	return r
 }

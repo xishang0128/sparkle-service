@@ -12,6 +12,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"sparkle-service/core/controller"
+	"sparkle-service/core/security"
+
 	"github.com/shirou/gopsutil/v4/process"
 )
 
@@ -461,7 +464,7 @@ func (cm *CoreManager) handleStartupNotification(launch *launchSession) {
 	controller := cm.controller
 	cm.mutex.Unlock()
 
-	if err := secureCoreBinary(launch.sourcePath); err != nil {
+	if err := security.SecureBinary(launch.sourcePath); err != nil {
 		log.Printf("核心启动通知后加固核心文件失败: %v", err)
 	}
 	if err := hardenLaunchControllerEndpoint(launch); err != nil {
@@ -553,7 +556,7 @@ func (cm *CoreManager) takeoverRestartedProcess() bool {
 
 		newPID, ok := findManagedCorePID(controller, oldPID, launch)
 		if ok {
-			if err := secureCoreBinary(launch.sourcePath); err != nil {
+			if err := security.SecureBinary(launch.sourcePath); err != nil {
 				log.Printf("重新接管前加固核心文件失败: %v", err)
 				_ = controller.Stop(newPID)
 				return false
@@ -737,7 +740,7 @@ func hardenLaunchControllerEndpoint(launch *launchSession) error {
 
 	deadline := time.Now().Add(2 * time.Second)
 	for {
-		err := hardenControllerEndpoint(launch.controllerNet, launch.controllerAddr)
+		err := controller.HardenEndpoint(launch.controllerNet, launch.controllerAddr)
 		if err == nil {
 			return nil
 		}

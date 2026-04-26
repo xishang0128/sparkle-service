@@ -9,6 +9,10 @@ import (
 	"path/filepath"
 	"runtime"
 	"sparkle-service/log"
+	"sparkle-service/route/auth"
+	"sparkle-service/route/coreapi"
+	"sparkle-service/route/pipectx"
+	"sparkle-service/route/sysproxyapi"
 	"sync"
 	"syscall"
 
@@ -41,11 +45,11 @@ func Start(addr string) error {
 
 	keyDir := filepath.Join(userDataDir, "sparkle", "keys")
 
-	if err := InitKeyManager(keyDir); err != nil {
+	if err := auth.InitKeyManager(keyDir); err != nil {
 		log.Printf("警告: 初始化密钥管理器失败: %v", err)
 	}
 
-	km := GetKeyManager()
+	km := auth.GetKeyManager()
 	if km.IsInitialized() {
 		log.Println("密钥管理器已初始化")
 	} else {
@@ -71,8 +75,8 @@ func Start(addr string) error {
 
 func Stop() error {
 	var errs []error
-	stopSysproxyGuard()
-	if err := stopCoreManager(); err != nil {
+	sysproxyapi.StopGuard()
+	if err := coreapi.Stop(); err != nil {
 		errs = append(errs, fmt.Errorf("停止核心失败：%w", err))
 	}
 	if err := closeServers(); err != nil {
@@ -150,7 +154,7 @@ func StartUnix(addr string) error {
 	if err != nil {
 		return fmt.Errorf("unix 监听错误：%w", err)
 	}
-	if uid, ok := GetKeyManager().GetAuthorizedUID(); ok {
+	if uid, ok := auth.GetKeyManager().GetAuthorizedUID(); ok {
 		if err := os.Chown(addr, int(uid), -1); err != nil {
 			_ = l.Close()
 			return fmt.Errorf("设置 unix socket 所有者失败：%w", err)
@@ -168,7 +172,7 @@ func StartUnix(addr string) error {
 	server := &http.Server{
 		Handler: router(),
 	}
-	configurePipeServer(server)
+	pipectx.ConfigureServer(server)
 	serverMu.Lock()
 	unixServer = server
 	serverMu.Unlock()
@@ -177,7 +181,7 @@ func StartUnix(addr string) error {
 
 func StartPipe(addr string) error {
 	pipeSDDL := ""
-	if sid, ok := GetKeyManager().GetAuthorizedSID(); ok {
+	if sid, ok := auth.GetKeyManager().GetAuthorizedSID(); ok {
 		pipeSDDL = fmt.Sprintf("D:PAI(A;OICI;GWGR;;;%s)(A;OICI;GWGR;;;SY)", sid)
 	}
 
@@ -190,7 +194,7 @@ func StartPipe(addr string) error {
 	server := &http.Server{
 		Handler: router(),
 	}
-	configurePipeServer(server)
+	pipectx.ConfigureServer(server)
 	serverMu.Lock()
 	pipeServer = server
 	serverMu.Unlock()

@@ -5,6 +5,7 @@ package core
 import (
 	"fmt"
 
+	"sparkle-service/core/security"
 	"sparkle-service/listen"
 )
 
@@ -19,7 +20,7 @@ func createNativeStartupHook(token string) (*coreStartupHook, error) {
 }
 
 func currentProcessPipeSDDL() string {
-	sid, err := currentProcessSID()
+	sid, err := security.CurrentProcessSID()
 	if err != nil {
 		return "D:P(A;;GA;;;SY)(A;;GA;;;BA)"
 	}

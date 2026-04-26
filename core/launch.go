@@ -15,6 +15,9 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
+
+	"sparkle-service/core/controller"
+	"sparkle-service/core/security"
 )
 
 type LaunchProfile struct {
@@ -151,7 +154,7 @@ func (cm *CoreManager) prepareLaunchSession(profileOverride *LaunchProfile, opti
 		saveLogs = *profile.SaveLogs
 	}
 
-	if err := secureCoreBinary(corePath); err != nil {
+	if err := security.SecureBinary(corePath); err != nil {
 		return nil, err
 	}
 
@@ -333,7 +336,7 @@ func resolveLaunchWorkingDir(corePath string, args []string) (string, error) {
 }
 
 func configureManagedController(args []string) ([]string, string, string, func(), error) {
-	controllerNet, controllerAddr, cleanup, err := createPrivateControllerEndpoint()
+	controllerNet, controllerAddr, cleanup, err := controller.CreatePrivateEndpoint()
 	if err != nil {
 		return nil, "", "", nil, err
 	}

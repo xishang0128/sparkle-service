@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	"sparkle-service/core"
+	"sparkle-service/core/startupnotify"
 
 	"github.com/spf13/cobra"
 )
@@ -20,7 +20,7 @@ var coreReadyCmd = &cobra.Command{
 		if coreReadyNetwork == "" || coreReadyAddress == "" || coreReadyToken == "" {
 			return fmt.Errorf("core ready notification requires network, address and token")
 		}
-		return core.SendStartupNotification(coreReadyNetwork, coreReadyAddress, coreReadyToken)
+		return startupnotify.Send(coreReadyNetwork, coreReadyAddress, coreReadyToken)
 	},
 }
 
