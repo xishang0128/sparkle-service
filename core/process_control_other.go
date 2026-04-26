@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"os/exec"
 	"syscall"
+	"time"
+
+	"github.com/shirou/gopsutil/v4/process"
 )
 
 type noopProcessController struct{}
@@ -63,9 +66,31 @@ func (c *noopProcessController) Stop(pid int32) error {
 	if err := syscall.Kill(int(pid), syscall.SIGKILL); err != nil && err != syscall.ESRCH && stopErr == nil {
 		stopErr = err
 	}
+	if exited, err := waitForUnixProcessExit(pid, 20, 100*time.Millisecond); err == nil {
+		if !exited && stopErr == nil {
+			stopErr = fmt.Errorf("等待核心进程退出超时")
+		}
+	} else if stopErr == nil {
+		stopErr = err
+	}
 	return stopErr
 }
 
 func (c *noopProcessController) Close() error {
 	return nil
+}
+
+func waitForUnixProcessExit(pid int32, attempts int, interval time.Duration) (bool, error) {
+	for range attempts {
+		exists, err := process.PidExists(pid)
+		if err != nil {
+			return false, err
+		}
+		if !exists {
+			return true, nil
+		}
+		time.Sleep(interval)
+	}
+
+	return false, nil
 }

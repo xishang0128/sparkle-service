@@ -176,6 +176,10 @@ func (cm *CoreManager) StartCoreWithProfile(profile *LaunchProfile) error {
 	cm.mutex.Lock()
 	defer cm.mutex.Unlock()
 
+	return cm.startCoreLocked(profile)
+}
+
+func (cm *CoreManager) startCoreLocked(profile *LaunchProfile) error {
 	if !cm.isRunning.CompareAndSwap(false, true) {
 		return fmt.Errorf("核心进程已在运行中")
 	}
@@ -302,6 +306,10 @@ func (cm *CoreManager) StopCore() error {
 	cm.mutex.Lock()
 	defer cm.mutex.Unlock()
 
+	return cm.stopCoreLocked()
+}
+
+func (cm *CoreManager) stopCoreLocked() error {
 	if cm.pid.Load() == 0 && cm.controller == nil && cm.launch == nil && !cm.isRunning.Load() {
 		return nil
 	}
@@ -324,13 +332,16 @@ func (cm *CoreManager) RestartCore() error {
 }
 
 func (cm *CoreManager) RestartCoreWithProfile(profile *LaunchProfile) error {
+	cm.mutex.Lock()
+	defer cm.mutex.Unlock()
+
 	cm.emitCoreEvent(CoreEventRestarting, "核心正在重启", nil)
-	if err := cm.StopCore(); err != nil {
+	if err := cm.stopCoreLocked(); err != nil {
 		log.Printf("停止进程时出错: %v", err)
 	}
 
 	time.Sleep(100 * time.Millisecond)
-	return cm.StartCoreWithProfile(profile)
+	return cm.startCoreLocked(profile)
 }
 
 func (cm *CoreManager) ApplyLaunchProfile(profile LaunchProfile) {
