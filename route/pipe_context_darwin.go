@@ -14,7 +14,9 @@ import (
 type darwinPeerContextKey struct{}
 
 type darwinPeerInfo struct {
-	UID uint32
+	UID    uint32
+	GID    uint32
+	HasGID bool
 }
 
 type syscallConn interface {
@@ -52,6 +54,10 @@ func getDarwinPeerInfo(conn net.Conn) (darwinPeerInfo, bool) {
 			return
 		}
 		info = darwinPeerInfo{UID: cred.Uid}
+		if cred.Ngroups > 0 {
+			info.GID = cred.Groups[0]
+			info.HasGID = true
+		}
 		okay = true
 	}); err != nil {
 		return darwinPeerInfo{}, false

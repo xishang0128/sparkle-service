@@ -48,6 +48,7 @@ type launchSession struct {
 	saveLogs       bool
 	maxLogBytes    int64
 	logWriter      *boundedLogWriter
+	fileAccess     fileAccess
 	controllerNet  string
 	controllerAddr string
 	profile        LaunchProfile
@@ -134,7 +135,7 @@ func PatchLaunchProfile(patch LaunchProfilePatch) (LaunchProfile, error) {
 	return LoadLaunchProfile()
 }
 
-func (cm *CoreManager) prepareLaunchSession(profileOverride *LaunchProfile) (*launchSession, error) {
+func (cm *CoreManager) prepareLaunchSession(profileOverride *LaunchProfile, options launchOptions) (*launchSession, error) {
 	profile, err := resolveLaunchProfile(profileOverride)
 	if err != nil {
 		return nil, err
@@ -188,6 +189,7 @@ func (cm *CoreManager) prepareLaunchSession(profileOverride *LaunchProfile) (*la
 		logPath:        profile.LogPath,
 		saveLogs:       saveLogs,
 		maxLogBytes:    maxLogFileSizeBytes(profile.MaxLogFileSizeMB),
+		fileAccess:     options.fileAccess,
 		controllerNet:  controllerNet,
 		controllerAddr: controllerAddr,
 		profile:        profile,

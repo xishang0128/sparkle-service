@@ -16,6 +16,7 @@ type coreLogSettings struct {
 	path     string
 	saveLogs bool
 	maxBytes int64
+	access   fileAccess
 }
 
 type boundedLogWriter struct {
@@ -24,6 +25,7 @@ type boundedLogWriter struct {
 	path      string
 	saveLogs  bool
 	maxBytes  int64
+	access    fileAccess
 	closed    bool
 	lastError string
 }
@@ -33,6 +35,7 @@ func newBoundedLogWriter(settings coreLogSettings) *boundedLogWriter {
 		path:     settings.path,
 		saveLogs: settings.saveLogs,
 		maxBytes: settings.maxBytes,
+		access:   settings.access,
 	}
 }
 
@@ -51,6 +54,7 @@ func (w *boundedLogWriter) Update(settings coreLogSettings) {
 	w.path = settings.path
 	w.saveLogs = settings.saveLogs
 	w.maxBytes = settings.maxBytes
+	w.access = settings.access
 	w.lastError = ""
 
 	if w.saveLogs && w.path != "" {
@@ -102,13 +106,17 @@ func (w *boundedLogWriter) ensureOpenLocked() error {
 	if w.file != nil {
 		return nil
 	}
-	if err := os.MkdirAll(filepath.Dir(w.path), 0o755); err != nil {
+	if err := ensureCoreLogDir(filepath.Dir(w.path), w.access); err != nil {
 		return fmt.Errorf("创建核心日志目录失败：%w", err)
 	}
 
 	file, err := os.OpenFile(w.path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
 		return fmt.Errorf("打开核心日志文件失败：%w", err)
+	}
+	if err := applyCoreLogFileAccess(w.path, w.access); err != nil {
+		_ = file.Close()
+		return err
 	}
 	w.file = file
 	return w.enforceLimitLocked()
@@ -144,6 +152,10 @@ func (w *boundedLogWriter) enforceLimitLocked() error {
 	if err := os.WriteFile(w.path, content, 0o600); err != nil {
 		_ = w.reopenLocked()
 		return fmt.Errorf("裁剪核心日志文件失败：%w", err)
+	}
+	if err := applyCoreLogFileAccess(w.path, w.access); err != nil {
+		_ = w.reopenLocked()
+		return err
 	}
 
 	return w.reopenLocked()
@@ -184,6 +196,10 @@ func (w *boundedLogWriter) reopenLocked() error {
 	if err != nil {
 		return fmt.Errorf("重新打开核心日志文件失败：%w", err)
 	}
+	if err := applyCoreLogFileAccess(w.path, w.access); err != nil {
+		_ = file.Close()
+		return err
+	}
 	w.file = file
 	return nil
 }
@@ -207,7 +223,7 @@ func (w *boundedLogWriter) reportErrorLocked(err error) {
 	log.Printf("写入核心日志失败: %v", err)
 }
 
-func coreLogSettingsFromProfile(profile LaunchProfile) coreLogSettings {
+func coreLogSettingsFromProfile(profile LaunchProfile, access fileAccess) coreLogSettings {
 	saveLogs := true
 	if profile.SaveLogs != nil {
 		saveLogs = *profile.SaveLogs
@@ -216,5 +232,6 @@ func coreLogSettingsFromProfile(profile LaunchProfile) coreLogSettings {
 		path:     profile.LogPath,
 		saveLogs: saveLogs,
 		maxBytes: maxLogFileSizeBytes(profile.MaxLogFileSizeMB),
+		access:   access,
 	}
 }

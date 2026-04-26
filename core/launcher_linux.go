@@ -392,7 +392,7 @@ func linuxSandboxMounts(launch *launchSession) ([]linuxSandboxMount, error) {
 	}
 	if launch.logPath != "" {
 		logDir := filepath.Dir(launch.logPath)
-		if err := os.MkdirAll(logDir, 0o755); err != nil {
+		if err := ensureCoreLogDir(logDir, launch.fileAccess); err != nil {
 			return nil, err
 		}
 		if err := addWritableDir(logDir); err != nil {

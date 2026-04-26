@@ -172,14 +172,14 @@ func (cm *CoreManager) StartCore() error {
 	return cm.StartCoreWithProfile(nil)
 }
 
-func (cm *CoreManager) StartCoreWithProfile(profile *LaunchProfile) error {
+func (cm *CoreManager) StartCoreWithProfile(profile *LaunchProfile, options ...LaunchOption) error {
 	cm.mutex.Lock()
 	defer cm.mutex.Unlock()
 
-	return cm.startCoreLocked(profile)
+	return cm.startCoreLocked(profile, collectLaunchOptions(options))
 }
 
-func (cm *CoreManager) startCoreLocked(profile *LaunchProfile) error {
+func (cm *CoreManager) startCoreLocked(profile *LaunchProfile, options launchOptions) error {
 	if !cm.isRunning.CompareAndSwap(false, true) {
 		return fmt.Errorf("核心进程已在运行中")
 	}
@@ -187,14 +187,14 @@ func (cm *CoreManager) startCoreLocked(profile *LaunchProfile) error {
 
 	cm.stopChan = make(chan struct{})
 
-	return cm.startProcessLocked(profile)
+	return cm.startProcessLocked(profile, options)
 }
 
-func (cm *CoreManager) startProcessLocked(profile *LaunchProfile) error {
+func (cm *CoreManager) startProcessLocked(profile *LaunchProfile, options launchOptions) error {
 	errBuffer := newBoundedOutputBuffer(startupBufferLimit)
 	startupWatcher := newStartupLogWatcher()
 
-	launch, err := cm.prepareLaunchSession(profile)
+	launch, err := cm.prepareLaunchSession(profile, options)
 	if err != nil {
 		cm.monitoring.Store(false)
 		cm.signalStopLocked()
@@ -207,6 +207,7 @@ func (cm *CoreManager) startProcessLocked(profile *LaunchProfile) error {
 		path:     launch.logPath,
 		saveLogs: launch.saveLogs,
 		maxBytes: launch.maxLogBytes,
+		access:   launch.fileAccess,
 	})
 	launch.logWriter = logWriter
 
@@ -331,7 +332,7 @@ func (cm *CoreManager) RestartCore() error {
 	return cm.RestartCoreWithProfile(nil)
 }
 
-func (cm *CoreManager) RestartCoreWithProfile(profile *LaunchProfile) error {
+func (cm *CoreManager) RestartCoreWithProfile(profile *LaunchProfile, options ...LaunchOption) error {
 	cm.mutex.Lock()
 	defer cm.mutex.Unlock()
 
@@ -341,10 +342,10 @@ func (cm *CoreManager) RestartCoreWithProfile(profile *LaunchProfile) error {
 	}
 
 	time.Sleep(100 * time.Millisecond)
-	return cm.startCoreLocked(profile)
+	return cm.startCoreLocked(profile, collectLaunchOptions(options))
 }
 
-func (cm *CoreManager) ApplyLaunchProfile(profile LaunchProfile) {
+func (cm *CoreManager) ApplyLaunchProfile(profile LaunchProfile, options ...LaunchOption) {
 	cm.mutex.Lock()
 	defer cm.mutex.Unlock()
 
@@ -352,10 +353,16 @@ func (cm *CoreManager) ApplyLaunchProfile(profile LaunchProfile) {
 		return
 	}
 
-	settings := coreLogSettingsFromProfile(profile)
+	launchOptions := collectLaunchOptions(options)
+	access := cm.launch.fileAccess
+	if launchOptions.fileAccess.ok {
+		access = launchOptions.fileAccess
+	}
+	settings := coreLogSettingsFromProfile(profile, access)
 	cm.launch.profile.LogPath = profile.LogPath
 	cm.launch.profile.SaveLogs = profile.SaveLogs
 	cm.launch.profile.MaxLogFileSizeMB = profile.MaxLogFileSizeMB
+	cm.launch.fileAccess = settings.access
 	cm.launch.logPath = settings.path
 	cm.launch.saveLogs = settings.saveLogs
 	cm.launch.maxLogBytes = settings.maxBytes
@@ -502,8 +509,10 @@ func (cm *CoreManager) handleProcessExit() {
 	}
 
 	profile := LaunchProfile{}
+	access := fileAccess{}
 	if cm.launch != nil {
 		profile = cm.launch.profile
+		access = cm.launch.fileAccess
 	}
 	cm.emitCoreEvent(CoreEventRestarting, "核心异常退出，正在重启", nil)
 	cm.monitoring.Store(false)
@@ -513,7 +522,7 @@ func (cm *CoreManager) handleProcessExit() {
 
 	go func() {
 		for retries := range 3 {
-			if err := cm.StartCoreWithProfile(&profile); err != nil {
+			if err := cm.StartCoreWithProfile(&profile, withFileAccess(access)); err != nil {
 				log.Printf("重启核心进程失败 (尝试 %d/3): %v", retries+1, err)
 				time.Sleep(time.Second * time.Duration(retries+1))
 				continue
