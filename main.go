@@ -8,7 +8,9 @@ import (
 
 func main() {
 	if err := cmd.MainCmd.Execute(); err != nil {
-		fmt.Println(err)
+		if !cmd.IsReportedError(err) {
+			fmt.Println(err)
+		}
 		os.Exit(1)
 	}
 }

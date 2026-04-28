@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"runtime"
 
 	"github.com/spf13/cobra"
@@ -20,8 +21,31 @@ var (
 )
 
 var MainCmd = &cobra.Command{
-	Use:   "sparkle-service",
-	Short: "Sparkle Service",
+	Use:           "sparkle-service",
+	Short:         "Sparkle Service",
+	SilenceErrors: true,
+	SilenceUsage:  true,
+}
+
+type reportedError struct {
+	err error
+}
+
+func (e reportedError) Error() string {
+	return e.err.Error()
+}
+
+func (e reportedError) Unwrap() error {
+	return e.err
+}
+
+func newReportedError(err error) error {
+	return reportedError{err: err}
+}
+
+func IsReportedError(err error) bool {
+	var target reportedError
+	return errors.As(err, &target)
 }
 
 func init() {

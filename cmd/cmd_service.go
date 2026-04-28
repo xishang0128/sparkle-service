@@ -1,8 +1,11 @@
 package cmd
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
+	"strings"
+
 	"sparkle-service/log"
 	"sparkle-service/route"
 	appservice "sparkle-service/service"
@@ -13,6 +16,14 @@ import (
 
 type Program struct {
 	listen string
+}
+
+type serviceCommandStatus struct {
+	Action  string `json:"action,omitempty"`
+	State   string `json:"state,omitempty"`
+	Success bool   `json:"success"`
+	Changed bool   `json:"changed,omitempty"`
+	Error   string `json:"error,omitempty"`
 }
 
 func (p *Program) Start(s kservice.Service) error {
@@ -45,10 +56,63 @@ func (p *Program) Stop(s kservice.Service) error {
 	return nil
 }
 
+func outputServiceCommandResult(message string, status serviceCommandStatus) error {
+	status.Success = true
+	log.S().Infow(message, "status", status)
+	return nil
+}
+
+func outputServiceCommandError(action, message string, err error) error {
+	if err == nil {
+		return nil
+	}
+	log.S().Errorw(message, "status", serviceCommandStatus{
+		Action:  action,
+		State:   serviceErrorState(err),
+		Success: false,
+		Error:   err.Error(),
+	})
+	return newReportedError(err)
+}
+
+func serviceErrorState(err error) string {
+	if err == nil {
+		return ""
+	}
+	if errors.Is(err, kservice.ErrNotInstalled) || strings.Contains(strings.ToLower(err.Error()), "service is not installed") {
+		return "not-installed"
+	}
+	return ""
+}
+
+func normalizeServiceStatus(status kservice.Status) string {
+	switch status {
+	case kservice.StatusRunning:
+		return "running"
+	case kservice.StatusStopped:
+		return "stopped"
+	case kservice.StatusUnknown:
+		return "unknown"
+	default:
+		return "unknown"
+	}
+}
+
+func serviceStatusMessage(state string) string {
+	switch state {
+	case "running":
+		return "服务状态：运行中"
+	case "stopped":
+		return "服务状态：已停止"
+	default:
+		return "服务状态：未知"
+	}
+}
+
 var serviceInstallCmd = &cobra.Command{
 	Use:   "install",
 	Short: "安装 Sparkle 服务",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		listenAddr := listen
 		if listenAddr == "" {
 			listenAddr = defaultAddr
@@ -57,26 +121,23 @@ var serviceInstallCmd = &cobra.Command{
 		prg := &Program{listen: listenAddr}
 		s, err := appservice.New(prg, os.Args[0])
 		if err != nil {
-			log.Println("创建服务失败：", err)
-			return
+			return outputServiceCommandError("install", "创建服务失败", err)
 		}
 
 		if err := s.Install(); err != nil {
-			log.Println("安装服务失败：", err)
-			return
+			return outputServiceCommandError("install", "安装服务失败", err)
 		}
 		if err := s.Start(); err != nil {
-			log.Println("启动服务失败：", err)
-			return
+			return outputServiceCommandError("install", "启动服务失败", err)
 		}
-		log.Println("服务安装成功")
+		return outputServiceCommandResult("服务安装成功", serviceCommandStatus{Action: "install", State: "running"})
 	},
 }
 
 var serviceUninstallCmd = &cobra.Command{
 	Use:   "uninstall",
 	Short: "卸载 Sparkle 服务",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		listenAddr := listen
 		if listenAddr == "" {
 			listenAddr = defaultAddr
@@ -84,26 +145,23 @@ var serviceUninstallCmd = &cobra.Command{
 		prg := &Program{listen: listenAddr}
 		s, err := appservice.New(prg, "")
 		if err != nil {
-			log.Println("创建服务失败：", err)
-			return
+			return outputServiceCommandError("uninstall", "创建服务失败", err)
 		}
 
 		if err := s.Stop(); err != nil {
-			log.Println("停止服务失败：", err)
-			return
+			return outputServiceCommandError("uninstall", "停止服务失败", err)
 		}
 		if err := s.Uninstall(); err != nil {
-			log.Println("卸载服务失败：", err)
-			return
+			return outputServiceCommandError("uninstall", "卸载服务失败", err)
 		}
-		log.Println("服务卸载成功")
+		return outputServiceCommandResult("服务卸载成功", serviceCommandStatus{Action: "uninstall", State: "not-installed"})
 	},
 }
 
 var serviceStartCmd = &cobra.Command{
 	Use:   "start",
 	Short: "启动 Sparkle 服务",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		listenAddr := listen
 		if listenAddr == "" {
 			listenAddr = defaultAddr
@@ -111,22 +169,20 @@ var serviceStartCmd = &cobra.Command{
 		prg := &Program{listen: listenAddr}
 		s, err := appservice.New(prg, "")
 		if err != nil {
-			log.Println("创建服务失败：", err)
-			return
+			return outputServiceCommandError("start", "创建服务失败", err)
 		}
 
 		if err := s.Start(); err != nil {
-			log.Println("启动服务失败：", err)
-			return
+			return outputServiceCommandError("start", "启动服务失败", err)
 		}
-		log.Println("服务启动成功")
+		return outputServiceCommandResult("服务启动成功", serviceCommandStatus{Action: "start", State: "running"})
 	},
 }
 
 var serviceStopCmd = &cobra.Command{
 	Use:   "stop",
 	Short: "停止 Sparkle 服务",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		listenAddr := listen
 		if listenAddr == "" {
 			listenAddr = defaultAddr
@@ -134,22 +190,20 @@ var serviceStopCmd = &cobra.Command{
 		prg := &Program{listen: listenAddr}
 		s, err := appservice.New(prg, "")
 		if err != nil {
-			log.Println("创建服务失败：", err)
-			return
+			return outputServiceCommandError("stop", "创建服务失败", err)
 		}
 
 		if err := s.Stop(); err != nil {
-			log.Println("停止服务失败：", err)
-			return
+			return outputServiceCommandError("stop", "停止服务失败", err)
 		}
-		log.Println("服务停止成功")
+		return outputServiceCommandResult("服务停止成功", serviceCommandStatus{Action: "stop", State: "stopped"})
 	},
 }
 
 var serviceRestartCmd = &cobra.Command{
 	Use:   "restart",
 	Short: "重启 Sparkle 服务",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		listenAddr := listen
 		if listenAddr == "" {
 			listenAddr = defaultAddr
@@ -157,22 +211,20 @@ var serviceRestartCmd = &cobra.Command{
 		prg := &Program{listen: listenAddr}
 		s, err := appservice.New(prg, "")
 		if err != nil {
-			log.Println("创建服务失败：", err)
-			return
+			return outputServiceCommandError("restart", "创建服务失败", err)
 		}
 
 		if err := s.Restart(); err != nil {
-			log.Println("重启服务失败：", err)
-			return
+			return outputServiceCommandError("restart", "重启服务失败", err)
 		}
-		log.Println("服务重启成功")
+		return outputServiceCommandResult("服务重启成功", serviceCommandStatus{Action: "restart", State: "running"})
 	},
 }
 
 var serviceStatusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "查看 Sparkle 服务状态",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		listenAddr := listen
 		if listenAddr == "" {
 			listenAddr = defaultAddr
@@ -180,26 +232,16 @@ var serviceStatusCmd = &cobra.Command{
 		prg := &Program{listen: listenAddr}
 		s, err := appservice.New(prg, "")
 		if err != nil {
-			log.Println("创建服务失败：", err)
-			return
+			return outputServiceCommandError("status", "创建服务失败", err)
 		}
 
 		status, err := s.Status()
 		if err != nil {
-			log.Println("查询服务状态失败：", err)
-			return
+			return outputServiceCommandError("status", "查询服务状态失败", err)
 		}
 
-		switch status {
-		case kservice.StatusRunning:
-			log.Println("服务状态：运行中")
-		case kservice.StatusStopped:
-			log.Println("服务状态：已停止")
-		case kservice.StatusUnknown:
-			log.Println("服务状态：未知")
-		default:
-			log.Println("服务状态：未知")
-		}
+		state := normalizeServiceStatus(status)
+		return outputServiceCommandResult(serviceStatusMessage(state), serviceCommandStatus{Action: "status", State: state})
 	},
 }
 
@@ -235,17 +277,15 @@ var serviceCmd = &cobra.Command{
 var serviceInitCmd = &cobra.Command{
 	Use:   "init",
 	Short: "初始化服务（传入公钥）",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		publicKey := cmd.Flag("public-key").Value.String()
 		authorizedSID := cmd.Flag("authorized-sid").Value.String()
 		authorizedUID, _ := cmd.Flags().GetUint32("authorized-uid")
 		if publicKey == "" {
-			log.Println("错误：必须通过 --public-key 参数提供公钥")
-			return
+			return outputServiceCommandError("init", "错误：必须通过 --public-key 参数提供公钥", errors.New("必须通过 --public-key 参数提供公钥"))
 		}
 		if authorizedSID == "" && !cmd.Flags().Changed("authorized-uid") {
-			log.Println("错误：必须通过 --authorized-sid 或 --authorized-uid 绑定允许访问服务的用户身份")
-			return
+			return outputServiceCommandError("init", "错误：必须通过 --authorized-sid 或 --authorized-uid 绑定允许访问服务的用户身份", errors.New("必须通过 --authorized-sid 或 --authorized-uid 绑定允许访问服务的用户身份"))
 		}
 		userDataDir := route.GetConfigDir()
 		keyDir := filepath.Join(userDataDir, "sparkle", "keys")
@@ -255,8 +295,7 @@ var serviceInitCmd = &cobra.Command{
 		km := route.GetKeyManager()
 		keyChanged, err := km.SetPublicKey(publicKey)
 		if err != nil {
-			log.Println("设置公钥失败：", err)
-			return
+			return outputServiceCommandError("init", "设置公钥失败", err)
 		}
 
 		principalChanged := false
@@ -264,21 +303,20 @@ var serviceInitCmd = &cobra.Command{
 		case authorizedSID != "":
 			principalChanged, err = km.SetAuthorizedSID(authorizedSID)
 			if err != nil {
-				log.Println("设置授权 SID 失败：", err)
-				return
+				return outputServiceCommandError("init", "设置授权 SID 失败", err)
 			}
 		case cmd.Flags().Changed("authorized-uid"):
 			principalChanged, err = km.SetAuthorizedUID(authorizedUID)
 			if err != nil {
-				log.Println("设置授权 UID 失败：", err)
-				return
+				return outputServiceCommandError("init", "设置授权 UID 失败", err)
 			}
 		}
 
-		if keyChanged || principalChanged {
-			log.Println("服务初始化成功，认证配置已更新")
+		changed := keyChanged || principalChanged
+		if changed {
+			_ = outputServiceCommandResult("服务初始化成功，认证配置已更新", serviceCommandStatus{Action: "init", Changed: true})
 		} else {
-			log.Println("服务初始化成功，认证配置未变化")
+			_ = outputServiceCommandResult("服务初始化成功，认证配置未变化", serviceCommandStatus{Action: "init"})
 		}
 
 		listenAddr := listen
@@ -288,32 +326,27 @@ var serviceInitCmd = &cobra.Command{
 		prg := &Program{listen: listenAddr}
 		s, err := appservice.New(prg, "")
 		if err != nil {
-			log.Println("创建服务失败：", err)
-			return
+			return outputServiceCommandError("init", "创建服务失败", err)
 		}
 
 		status, err := s.Status()
 		if err != nil {
-			log.Println("查询服务状态失败：", err)
-			log.Println("提示：如果服务正在运行，请手动执行 'restart' 命令")
-			return
+			return outputServiceCommandError("status", "查询服务状态失败；如果服务正在运行，请手动执行 'restart' 命令", err)
 		}
 
+		state := normalizeServiceStatus(status)
 		if status == kservice.StatusRunning {
-			if !keyChanged && !principalChanged {
-				log.Println("服务已在运行，配置未变化，无需重启")
-				return
+			if !changed {
+				return outputServiceCommandResult("服务已在运行，配置未变化，无需重启", serviceCommandStatus{Action: "init", State: state})
 			}
-			log.Println("正在重启服务...")
+			log.S().Infow("正在重启服务...", "status", serviceCommandStatus{Action: "restart", State: state, Success: true})
 			if err := s.Restart(); err != nil {
-				log.Println("重启服务失败：", err)
-				log.Println("请手动执行 'sparkle-service service restart' 命令")
-				return
+				return outputServiceCommandError("restart", "重启服务失败；请手动执行 'sparkle-service service restart' 命令", err)
 			}
-			log.Println("服务已成功重启")
-		} else {
-			log.Println("服务未运行，配置将在下次启动时生效")
+			return outputServiceCommandResult("服务已成功重启", serviceCommandStatus{Action: "restart", State: "running"})
 		}
+
+		return outputServiceCommandResult("服务未运行，配置将在下次启动时生效", serviceCommandStatus{Action: "init", State: state, Changed: changed})
 	},
 }
 
