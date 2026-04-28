@@ -9,6 +9,7 @@ require (
 	github.com/shirou/gopsutil/v4 v4.26.3
 	github.com/spf13/cobra v1.10.2
 	github.com/xishang0128/sysproxy-go v0.0.0-20260426195823-de059c4f0a41
+	go.uber.org/zap v1.27.1
 	golang.org/x/sys v0.43.0
 )
 
@@ -23,4 +24,5 @@ require (
 	github.com/tklauser/go-sysconf v0.3.16 // indirect
 	github.com/tklauser/numcpus v0.11.0 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
+	go.uber.org/multierr v1.10.0 // indirect
 )
