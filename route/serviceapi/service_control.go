@@ -50,6 +50,9 @@ func controlServiceAsync(w http.ResponseWriter, action string, message string, f
 	}
 
 	httphelper.SendJSONWithStatus(w, http.StatusAccepted, "success", message)
+	if flusher, ok := w.(http.Flusher); ok {
+		flusher.Flush()
+	}
 
 	go func() {
 		time.Sleep(200 * time.Millisecond)

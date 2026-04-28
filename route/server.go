@@ -1,6 +1,7 @@
 package route
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -15,9 +16,12 @@ import (
 	"sparkle-service/route/sysproxyapi"
 	"sync"
 	"syscall"
+	"time"
 
 	"sparkle-service/listen"
 )
+
+const serverShutdownTimeout = 3 * time.Second
 
 var (
 	unixServer *http.Server
@@ -121,11 +125,26 @@ func closeServers() error {
 		if server == nil {
 			continue
 		}
-		if err := server.Close(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := shutdownServer(server); err != nil {
 			errs = append(errs, fmt.Errorf("关闭服务监听失败：%w", err))
 		}
 	}
 	return errors.Join(errs...)
+}
+
+func shutdownServer(server *http.Server) error {
+	ctx, cancel := context.WithTimeout(context.Background(), serverShutdownTimeout)
+	defer cancel()
+
+	if err := server.Shutdown(ctx); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if closeErr := server.Close(); closeErr != nil && !errors.Is(closeErr, http.ErrServerClosed) {
+			return errors.Join(err, closeErr)
+		}
+		if !errors.Is(err, context.DeadlineExceeded) {
+			return err
+		}
+	}
+	return nil
 }
 
 func ensureDirExists(dir string) error {

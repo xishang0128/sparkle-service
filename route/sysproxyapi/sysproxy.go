@@ -67,11 +67,15 @@ func pac(w http.ResponseWriter, r *http.Request) {
 		OnlyActiveDevice: req.OnlyActiveDevice,
 		UseRegistry:      req.UseRegistry,
 	})
+	StopGuard()
 	err := runSysproxyAsRequestUser(r, func() error {
-		if err := sysproxy.SetPac(opts); err != nil {
-			return err
-		}
-		return configureSysproxyGuard(r, req.Guard, sysproxyGuardModePAC, opts)
+		return runSysproxyMutation(func() error {
+			if err := sysproxy.SetPac(opts); err != nil {
+				return err
+			}
+			configureSysproxyGuardBestEffort(r, req.Guard, sysproxyGuardModePAC, opts)
+			return nil
+		})
 	})
 	log.Println("设置 PAC 耗时：", time.Since(t), "\nURL:", req.Url)
 	if err != nil {
@@ -96,11 +100,15 @@ func proxy(w http.ResponseWriter, r *http.Request) {
 		OnlyActiveDevice: req.OnlyActiveDevice,
 		UseRegistry:      req.UseRegistry,
 	})
+	StopGuard()
 	err := runSysproxyAsRequestUser(r, func() error {
-		if err := sysproxy.SetProxy(opts); err != nil {
-			return err
-		}
-		return configureSysproxyGuard(r, req.Guard, sysproxyGuardModeProxy, opts)
+		return runSysproxyMutation(func() error {
+			if err := sysproxy.SetProxy(opts); err != nil {
+				return err
+			}
+			configureSysproxyGuardBestEffort(r, req.Guard, sysproxyGuardModeProxy, opts)
+			return nil
+		})
 	})
 	log.Println("设置代理耗时：", time.Since(t), "\nserver:", req.Server, "\nbypass:", req.Bypass)
 	if err != nil {
@@ -123,12 +131,11 @@ func disable(w http.ResponseWriter, r *http.Request) {
 		OnlyActiveDevice: req.OnlyActiveDevice,
 		UseRegistry:      req.UseRegistry,
 	})
+	StopGuard()
 	err := runSysproxyAsRequestUser(r, func() error {
-		if err := sysproxy.DisableProxy(opts); err != nil {
-			return err
-		}
-		StopGuard()
-		return nil
+		return runSysproxyMutation(func() error {
+			return sysproxy.DisableProxy(opts)
+		})
 	})
 	log.Println("禁用代理耗时：", time.Since(t))
 	if err != nil {

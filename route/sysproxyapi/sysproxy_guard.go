@@ -45,7 +45,10 @@ type sysproxyGuardConfig struct {
 	runner   sysproxyGuardRunner
 }
 
-var globalSysproxyGuard = &sysproxyGuardState{}
+var (
+	globalSysproxyGuard = &sysproxyGuardState{}
+	sysproxyMutationMu  sync.Mutex
+)
 
 type sysproxyGuardState struct {
 	mu         sync.Mutex
@@ -84,8 +87,21 @@ func configureSysproxyGuard(r *http.Request, enabled bool, mode sysproxyGuardMod
 	return nil
 }
 
+func configureSysproxyGuardBestEffort(r *http.Request, enabled bool, mode sysproxyGuardMode, opts *sysproxy.Options) {
+	if err := configureSysproxyGuard(r, enabled, mode, opts); err != nil {
+		log.Printf("系统代理已设置，但系统代理守护启动失败：%v", err)
+		publishSysproxyGuardEvent(sysproxyEventGuardWatchFailed, mode, false, "系统代理守护启动失败，已停止", err)
+	}
+}
+
 func StopGuard() {
 	globalSysproxyGuard.stop()
+}
+
+func runSysproxyMutation(fn func() error) error {
+	sysproxyMutationMu.Lock()
+	defer sysproxyMutationMu.Unlock()
+	return fn()
 }
 
 func (s *sysproxyGuardState) start(config *sysproxyGuardConfig) {
@@ -162,10 +178,20 @@ func (s *sysproxyGuardState) run(ctx context.Context, generation uint64, config 
 			continue
 		}
 
-		if !sysproxyGuardMatches(config.mode, config.expected, current) && s.active(generation) {
-			log.Println("系统代理守护检测到代理设置被修改，正在恢复")
-			publishSysproxyGuardEvent(sysproxyEventGuardChanged, config.mode, true, "系统代理守护检测到代理设置被修改", nil)
-			err = config.runner.Apply(config.mode, config.opts)
+		if !sysproxyGuardMatches(config.mode, config.expected, current) {
+			restored := false
+			err = runSysproxyMutation(func() error {
+				if !s.active(generation) {
+					return nil
+				}
+				log.Println("系统代理守护检测到代理设置被修改，正在恢复")
+				publishSysproxyGuardEvent(sysproxyEventGuardChanged, config.mode, true, "系统代理守护检测到代理设置被修改", nil)
+				if err := config.runner.Apply(config.mode, config.opts); err != nil {
+					return err
+				}
+				restored = true
+				return nil
+			})
 			if err != nil {
 				errText := err.Error()
 				if errText != lastErr {
@@ -175,7 +201,9 @@ func (s *sysproxyGuardState) run(ctx context.Context, generation uint64, config 
 				}
 				continue
 			}
-			publishSysproxyGuardEvent(sysproxyEventGuardRestored, config.mode, true, "系统代理守护已恢复代理设置", nil)
+			if restored {
+				publishSysproxyGuardEvent(sysproxyEventGuardRestored, config.mode, true, "系统代理守护已恢复代理设置", nil)
+			}
 		}
 
 		lastErr = ""
