@@ -1,6 +1,7 @@
 package log
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	stdlog "log"
@@ -52,21 +53,28 @@ func (e *jsonPrettyEncoder) EncodeEntry(ent zapcore.Entry, fields []zapcore.Fiel
 		}
 	}
 
-	var out []byte
-	if e.pretty {
-		out, err = json.MarshalIndent(obj, "", "  ")
-	} else {
-		out, err = json.Marshal(obj)
-	}
+	out, err := marshalJSON(obj, e.pretty)
 	if err != nil {
 		return buf, nil
 	}
-	out = append(out, '\n')
 
 	newBuf := jsonBufferPool.Get()
 	newBuf.AppendBytes(out)
 	buf.Free()
 	return newBuf, nil
+}
+
+func marshalJSON(value any, pretty bool) ([]byte, error) {
+	var data bytes.Buffer
+	encoder := json.NewEncoder(&data)
+	encoder.SetEscapeHTML(false)
+	if pretty {
+		encoder.SetIndent("", "  ")
+	}
+	if err := encoder.Encode(value); err != nil {
+		return nil, err
+	}
+	return data.Bytes(), nil
 }
 
 func currentLogPath() string {
