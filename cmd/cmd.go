@@ -55,12 +55,14 @@ func init() {
 		defaultAddr = "/tmp/sparkle-service.sock"
 	}
 
-	MainCmd.AddCommand(proxyCmd)
-	MainCmd.AddCommand(pacCmd)
-	MainCmd.AddCommand(disableCmd)
-	MainCmd.AddCommand(statusCmd)
+	MainCmd.AddCommand(sysproxyCmd)
 	MainCmd.AddCommand(serverCmd)
 	MainCmd.AddCommand(serviceCmd)
+
+	sysproxyCmd.AddCommand(proxyCmd)
+	sysproxyCmd.AddCommand(pacCmd)
+	sysproxyCmd.AddCommand(disableCmd)
+	sysproxyCmd.AddCommand(statusCmd)
 
 	MainCmd.PersistentFlags().BoolVarP(&onlyActiveDevice, "only-active-device", "a", false, "仅对活跃的网络设备生效")
 	MainCmd.PersistentFlags().BoolVarP(&useRegistry, "use-registry", "r", false, "使用注册表设置")

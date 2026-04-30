@@ -9,6 +9,11 @@ import (
 	"github.com/xishang0128/sysproxy-go/sysproxy"
 )
 
+var sysproxyCmd = &cobra.Command{
+	Use:   "sysproxy",
+	Short: "管理系统代理设置",
+}
+
 var proxyCmd = &cobra.Command{
 	Use:   "proxy",
 	Short: "设置系统代理",
