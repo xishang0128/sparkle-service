@@ -78,10 +78,10 @@ sparkle-service [全局选项] <命令> [命令选项]
 
 | 命令                      | 说明                               |
 | ------------------------- | ---------------------------------- |
-| `proxy -s <地址> [-b <绕过>]` | 设置系统代理                   |
-| `pac -u <PAC地址>`        | 设置 PAC 代理                      |
-| `disable`                 | 取消系统代理设置                   |
-| `status`                  | 查看当前代理状态                   |
+| `sysproxy proxy -s <地址> [-b <绕过>]` | 设置系统代理              |
+| `sysproxy pac -u <PAC地址>` | 设置 PAC 代理                    |
+| `sysproxy disable`        | 取消系统代理设置                   |
+| `sysproxy status`         | 查看当前代理状态                   |
 | `server`                  | 前台启动 HTTP 服务（测试用）       |
 | `service install`         | 安装并启动系统服务                 |
 | `service uninstall`       | 停止并卸载系统服务                 |
@@ -94,16 +94,16 @@ sparkle-service [全局选项] <命令> [命令选项]
 
 ```bash
 # 设置系统代理
-sparkle-service proxy -s 127.0.0.1:7890 -b "localhost;127.*;10.*;192.168.*"
+sparkle-service sysproxy proxy -s 127.0.0.1:7890 -b "localhost;127.*;10.*;192.168.*"
 
 # 设置 PAC 代理
-sparkle-service pac -u http://127.0.0.1:7890/pac
+sparkle-service sysproxy pac -u http://127.0.0.1:7890/pac
 
 # 取消代理
-sparkle-service disable
+sparkle-service sysproxy disable
 
 # 查看代理状态
-sparkle-service status
+sparkle-service sysproxy status
 ```
 
 ## HTTP API
