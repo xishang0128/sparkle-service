@@ -16,8 +16,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"sparkle-service/core/controller"
-	"sparkle-service/core/security"
+	"github.com/UruhaLushia/sparkle-service/core/controller"
+	"github.com/UruhaLushia/sparkle-service/core/security"
 )
 
 type LaunchProfile struct {

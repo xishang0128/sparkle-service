@@ -265,7 +265,7 @@ GET /ping
 | kardianos/service          | 系统服务管理     |
 | shirou/gopsutil            | 进程信息获取     |
 | spf13/cobra                | CLI 框架         |
-| xishang0128/sysproxy-go    | 系统代理设置     |
+| UruhaLushia/sysproxy-go    | 系统代理设置     |
 | go.uber.org/zap            | 结构化日志       |
 
 ## 许可证

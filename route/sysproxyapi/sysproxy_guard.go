@@ -7,9 +7,9 @@ import (
 	"reflect"
 	"sync"
 
-	"sparkle-service/log"
+	"github.com/UruhaLushia/sparkle-service/log"
 
-	"github.com/xishang0128/sysproxy-go/sysproxy"
+	"github.com/UruhaLushia/sysproxy-go/sysproxy"
 )
 
 type sysproxyGuardMode string

@@ -4,21 +4,21 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/UruhaLushia/sparkle-service/log"
+	"github.com/UruhaLushia/sparkle-service/route/auth"
+	"github.com/UruhaLushia/sparkle-service/route/coreapi"
+	"github.com/UruhaLushia/sparkle-service/route/pipectx"
+	"github.com/UruhaLushia/sparkle-service/route/sysproxyapi"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
-	"sparkle-service/log"
-	"sparkle-service/route/auth"
-	"sparkle-service/route/coreapi"
-	"sparkle-service/route/pipectx"
-	"sparkle-service/route/sysproxyapi"
 	"sync"
 	"syscall"
 	"time"
 
-	"sparkle-service/listen"
+	"github.com/UruhaLushia/sparkle-service/listen"
 )
 
 const serverShutdownTimeout = 3 * time.Second

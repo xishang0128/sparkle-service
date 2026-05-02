@@ -3,8 +3,8 @@
 package coreapi
 
 import (
+	corepkg "github.com/UruhaLushia/sparkle-service/core"
 	"net/http"
-	corepkg "sparkle-service/core"
 )
 
 func coreLaunchOptions(_ *http.Request) []corepkg.LaunchOption {

@@ -5,9 +5,9 @@ package sysproxyapi
 import (
 	"net/http"
 
-	"sparkle-service/route/pipectx"
+	"github.com/UruhaLushia/sparkle-service/route/pipectx"
 
-	"github.com/xishang0128/sysproxy-go/sysproxy"
+	"github.com/UruhaLushia/sysproxy-go/sysproxy"
 )
 
 func runSysproxyAsRequestUser(r *http.Request, fn func() error) error {

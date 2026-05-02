@@ -5,8 +5,8 @@ package core
 import (
 	"fmt"
 
-	"sparkle-service/core/security"
-	"sparkle-service/listen"
+	"github.com/UruhaLushia/sparkle-service/core/security"
+	"github.com/UruhaLushia/sparkle-service/listen"
 )
 
 func createNativeStartupHook(token string) (*coreStartupHook, error) {

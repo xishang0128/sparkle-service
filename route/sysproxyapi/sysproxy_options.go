@@ -1,6 +1,6 @@
 package sysproxyapi
 
-import "github.com/xishang0128/sysproxy-go/sysproxy"
+import "github.com/UruhaLushia/sysproxy-go/sysproxy"
 
 func cloneSysproxyOptions(opt *sysproxy.Options) *sysproxy.Options {
 	if opt == nil {

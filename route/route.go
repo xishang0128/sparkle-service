@@ -1,13 +1,13 @@
 package route
 
 import (
+	"github.com/UruhaLushia/sparkle-service/route/auth"
+	"github.com/UruhaLushia/sparkle-service/route/coreapi"
+	"github.com/UruhaLushia/sparkle-service/route/httphelper"
+	"github.com/UruhaLushia/sparkle-service/route/serviceapi"
+	"github.com/UruhaLushia/sparkle-service/route/sysapi"
+	"github.com/UruhaLushia/sparkle-service/route/sysproxyapi"
 	"net/http"
-	"sparkle-service/route/auth"
-	"sparkle-service/route/coreapi"
-	"sparkle-service/route/httphelper"
-	"sparkle-service/route/serviceapi"
-	"sparkle-service/route/sysapi"
-	"sparkle-service/route/sysproxyapi"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"

@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"sparkle-service/listen"
+	"github.com/UruhaLushia/sparkle-service/listen"
 )
 
 func TestCmdEchoNamedPipe(t *testing.T) {

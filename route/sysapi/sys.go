@@ -2,9 +2,9 @@ package sysapi
 
 import (
 	"fmt"
+	"github.com/UruhaLushia/sparkle-service/route/httphelper"
+	"github.com/UruhaLushia/sparkle-service/sys"
 	"net/http"
-	"sparkle-service/route/httphelper"
-	"sparkle-service/sys"
 
 	"github.com/go-chi/chi/v5"
 )

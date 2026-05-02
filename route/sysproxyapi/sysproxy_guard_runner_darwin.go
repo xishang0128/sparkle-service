@@ -6,7 +6,7 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/xishang0128/sysproxy-go/sysproxy"
+	"github.com/UruhaLushia/sysproxy-go/sysproxy"
 )
 
 type darwinSysproxyGuardRunner struct{}

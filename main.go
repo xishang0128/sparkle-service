@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
+	"github.com/UruhaLushia/sparkle-service/cmd"
 	"os"
-	"sparkle-service/cmd"
 )
 
 func main() {

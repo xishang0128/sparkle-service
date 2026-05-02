@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"sparkle-service/route/httphelper"
+	"github.com/UruhaLushia/sparkle-service/route/httphelper"
 )
 
 const (

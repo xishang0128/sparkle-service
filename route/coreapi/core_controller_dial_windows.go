@@ -5,8 +5,8 @@ package coreapi
 import (
 	"context"
 	"fmt"
+	"github.com/UruhaLushia/sparkle-service/listen/namedpipe"
 	"net"
-	"sparkle-service/listen/namedpipe"
 )
 
 func dialCoreController(ctx context.Context, network string, address string) (net.Conn, error) {

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"sparkle-service/listen/namedpipe"
+	"github.com/UruhaLushia/sparkle-service/listen/namedpipe"
 )
 
 func Send(network string, address string, token string) error {

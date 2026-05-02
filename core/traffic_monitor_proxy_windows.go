@@ -6,12 +6,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/UruhaLushia/sparkle-service/listen"
+	"github.com/UruhaLushia/sparkle-service/listen/namedpipe"
 	"log"
 	"net"
 	"net/http"
 	"net/http/httputil"
-	"sparkle-service/listen"
-	"sparkle-service/listen/namedpipe"
 )
 
 const trafficMonitorPipeAddress = `\\.\pipe\Sparkle\mihomo`

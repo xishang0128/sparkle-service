@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/UruhaLushia/sysproxy-go/sysproxy"
 	"github.com/spf13/cobra"
-	"github.com/xishang0128/sysproxy-go/sysproxy"
 )
 
 var sysproxyCmd = &cobra.Command{

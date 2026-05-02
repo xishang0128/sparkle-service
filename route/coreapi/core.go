@@ -1,10 +1,10 @@
 package coreapi
 
 import (
+	corepkg "github.com/UruhaLushia/sparkle-service/core"
+	"github.com/UruhaLushia/sparkle-service/route/auth"
+	"github.com/UruhaLushia/sparkle-service/route/httphelper"
 	"net/http"
-	corepkg "sparkle-service/core"
-	"sparkle-service/route/auth"
-	"sparkle-service/route/httphelper"
 	"sync/atomic"
 
 	"github.com/go-chi/chi/v5"

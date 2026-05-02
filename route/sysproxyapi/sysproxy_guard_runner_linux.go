@@ -5,12 +5,12 @@ package sysproxyapi
 import (
 	"context"
 	"fmt"
+	"github.com/UruhaLushia/sparkle-service/route/pipectx"
 	"net/http"
 	"os"
-	"sparkle-service/route/pipectx"
 	"strings"
 
-	"github.com/xishang0128/sysproxy-go/sysproxy"
+	"github.com/UruhaLushia/sysproxy-go/sysproxy"
 )
 
 type linuxSysproxyGuardRunner struct {

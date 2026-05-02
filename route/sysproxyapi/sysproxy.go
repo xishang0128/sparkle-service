@@ -6,12 +6,12 @@ import (
 	"strings"
 	"time"
 
-	"sparkle-service/log"
-	"sparkle-service/route/httphelper"
+	"github.com/UruhaLushia/sparkle-service/log"
+	"github.com/UruhaLushia/sparkle-service/route/httphelper"
 
+	"github.com/UruhaLushia/sysproxy-go/sysproxy"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
-	"github.com/xishang0128/sysproxy-go/sysproxy"
 )
 
 type proxyRequest struct {
