@@ -23,6 +23,7 @@ type sysproxyGuardRunner interface {
 	Query(*sysproxy.Options) (*sysproxy.ProxyConfig, error)
 	Apply(sysproxyGuardMode, *sysproxy.Options) error
 	WaitChange(context.Context, *sysproxy.Options) error
+	WaitChangeReady(context.Context, *sysproxy.Options, func()) error
 	Close() error
 }
 
@@ -39,10 +40,11 @@ type sysproxyGuardSnapshot struct {
 }
 
 type sysproxyGuardConfig struct {
-	mode     sysproxyGuardMode
-	opts     *sysproxy.Options
-	expected sysproxyGuardSnapshot
-	runner   sysproxyGuardRunner
+	mode      sysproxyGuardMode
+	opts      *sysproxy.Options
+	watchOpts *sysproxy.Options
+	expected  sysproxyGuardSnapshot
+	runner    sysproxyGuardRunner
 }
 
 var (
@@ -78,10 +80,11 @@ func configureSysproxyGuard(r *http.Request, enabled bool, mode sysproxyGuardMod
 	fillSysproxyGuardApplyOptions(mode, guardOpts, expected)
 
 	globalSysproxyGuard.start(&sysproxyGuardConfig{
-		mode:     mode,
-		opts:     guardOpts,
-		expected: expected,
-		runner:   runner,
+		mode:      mode,
+		opts:      guardOpts,
+		watchOpts: newSysproxyGuardWatchOptions(guardOpts),
+		expected:  expected,
+		runner:    runner,
 	})
 
 	return nil
@@ -137,15 +140,6 @@ func (s *sysproxyGuardState) stop() {
 	}
 }
 
-func (s *sysproxyGuardState) finish(generation uint64) {
-	s.mu.Lock()
-	if s.generation == generation {
-		s.generation++
-		s.cancel = nil
-	}
-	s.mu.Unlock()
-}
-
 func (s *sysproxyGuardState) active(generation uint64) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -157,14 +151,16 @@ func (s *sysproxyGuardState) run(ctx context.Context, generation uint64, config 
 
 	var lastErr string
 	for {
-		if err := config.runner.WaitChange(ctx, config.opts); err != nil {
-			if ctx.Err() != nil {
-				return
-			}
-			log.Printf("系统代理守护等待变更失败，已停止：%v", err)
-			s.finish(generation)
-			publishSysproxyGuardEvent(sysproxyEventGuardWatchFailed, config.mode, false, "系统代理守护等待变更失败，已停止", err)
+		if ctx.Err() != nil {
 			return
+		}
+
+		watchCtx, cancelWatch, watchReady, watchErr := startSysproxyGuardWatch(ctx, config.runner, config.watchOpts)
+		select {
+		case <-ctx.Done():
+			cancelWatch()
+			return
+		case <-watchReady:
 		}
 
 		current, err := config.runner.Query(config.opts)
@@ -174,6 +170,9 @@ func (s *sysproxyGuardState) run(ctx context.Context, generation uint64, config 
 				log.Printf("系统代理守护检查失败：%v", err)
 				publishSysproxyGuardEvent(sysproxyEventGuardCheckFailed, config.mode, true, "系统代理守护检查失败", err)
 				lastErr = errText
+			}
+			if !waitSysproxyGuardNextChange(ctx, cancelWatch, watchErr) {
+				return
 			}
 			continue
 		}
@@ -189,6 +188,13 @@ func (s *sysproxyGuardState) run(ctx context.Context, generation uint64, config 
 				if err := config.runner.Apply(config.mode, config.opts); err != nil {
 					return err
 				}
+				current, err := config.runner.Query(config.opts)
+				if err != nil {
+					return fmt.Errorf("系统代理守护恢复后检查失败：%w", err)
+				}
+				if !sysproxyGuardMatches(config.mode, config.expected, current) {
+					return fmt.Errorf("系统代理守护恢复后状态仍不匹配：expected=%+v current=%+v", config.expected, newSysproxyGuardSnapshot(config.mode, current))
+				}
 				restored = true
 				return nil
 			})
@@ -199,6 +205,9 @@ func (s *sysproxyGuardState) run(ctx context.Context, generation uint64, config 
 					publishSysproxyGuardEvent(sysproxyEventGuardRestoreFailed, config.mode, true, "系统代理守护恢复失败", err)
 					lastErr = errText
 				}
+				if !waitSysproxyGuardNextChange(ctx, nil, watchErr) {
+					return
+				}
 				continue
 			}
 			if restored {
@@ -207,6 +216,58 @@ func (s *sysproxyGuardState) run(ctx context.Context, generation uint64, config 
 		}
 
 		lastErr = ""
+
+		select {
+		case <-ctx.Done():
+			cancelWatch()
+			return
+		case err := <-watchErr:
+			if err == nil {
+				continue
+			}
+			if ctx.Err() != nil {
+				return
+			}
+			errText := err.Error()
+			if errText != lastErr {
+				log.Printf("系统代理守护等待变更失败，将继续重试：%v", err)
+				publishSysproxyGuardEvent(sysproxyEventGuardWatchFailed, config.mode, true, "系统代理守护等待变更失败，将继续重试", err)
+				lastErr = errText
+			}
+		case <-watchCtx.Done():
+			if ctx.Err() != nil {
+				return
+			}
+		}
+	}
+}
+
+func startSysproxyGuardWatch(ctx context.Context, runner sysproxyGuardRunner, opts *sysproxy.Options) (context.Context, context.CancelFunc, <-chan struct{}, <-chan error) {
+	watchCtx, cancel := context.WithCancel(ctx)
+	ready := make(chan struct{})
+	errCh := make(chan error, 1)
+	var readyOnce sync.Once
+
+	go func() {
+		err := runner.WaitChangeReady(watchCtx, opts, func() {
+			readyOnce.Do(func() { close(ready) })
+		})
+		readyOnce.Do(func() { close(ready) })
+		errCh <- err
+	}()
+
+	return watchCtx, cancel, ready, errCh
+}
+
+func waitSysproxyGuardNextChange(ctx context.Context, cancelWatch context.CancelFunc, watchErr <-chan error) bool {
+	if cancelWatch != nil {
+		defer cancelWatch()
+	}
+	select {
+	case <-ctx.Done():
+		return false
+	case <-watchErr:
+		return true
 	}
 }
 
@@ -248,6 +309,18 @@ func fillSysproxyGuardApplyOptions(mode sysproxyGuardMode, opts *sysproxy.Option
 		opts.Bypass = expected.ProxyBypass
 	case sysproxyGuardModePAC:
 		opts.PACURL = expected.PACURL
+	}
+}
+
+func newSysproxyGuardWatchOptions(opts *sysproxy.Options) *sysproxy.Options {
+	if opts == nil {
+		return &sysproxy.Options{}
+	}
+
+	return &sysproxy.Options{
+		Device:           opts.Device,
+		OnlyActiveDevice: opts.OnlyActiveDevice,
+		UseRegistry:      opts.UseRegistry,
 	}
 }
 

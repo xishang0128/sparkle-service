@@ -49,6 +49,13 @@ func (r *linuxSysproxyGuardRunner) WaitChange(ctx context.Context, opts *sysprox
 	return sysproxy.WaitProxySettingsChange(ctx, r.sessionOptions(opts))
 }
 
+func (r *linuxSysproxyGuardRunner) WaitChangeReady(ctx context.Context, opts *sysproxy.Options, ready func()) error {
+	if ready != nil {
+		ready()
+	}
+	return sysproxy.WaitProxySettingsChange(ctx, r.sessionOptions(opts))
+}
+
 func (r *linuxSysproxyGuardRunner) Close() error {
 	return nil
 }
