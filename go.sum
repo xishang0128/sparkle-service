@@ -1,5 +1,5 @@
-github.com/UruhaLushia/sysproxy-go v1.0.0 h1:+t5jTwaomvnBftXt8paNK3vKbyRhGn/iL6GN09hbHOA=
-github.com/UruhaLushia/sysproxy-go v1.0.0/go.mod h1:no0OqTTN6MSu06WfnitpA97loiZyw92WjWXYMO3QBks=
+github.com/UruhaLushia/sysproxy-go v1.0.1-0.20260506180946-a7e54738f47b h1:DBkdenrjqacfFvjm9XPb+ZCIQEqb+lJ007hi/J+9/rI=
+github.com/UruhaLushia/sysproxy-go v1.0.1-0.20260506180946-a7e54738f47b/go.mod h1:no0OqTTN6MSu06WfnitpA97loiZyw92WjWXYMO3QBks=
 github.com/ajg/form v1.5.1/go.mod h1:uL1WgH+h2mgNtvBq0339dVnzXdBETtL2LeUXaIv25UY=
 github.com/ajg/form v1.7.1 h1:OsnBDzTkrWdrxvEnO68I72ZVGJGNaMwPhoAm0V+llgc=
 github.com/ajg/form v1.7.1/go.mod h1:HL757PzLyNkj5AIfptT6L+iGNeXTlnrr/oDePGc/y7Q=

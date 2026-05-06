@@ -3,7 +3,7 @@ module github.com/UruhaLushia/sparkle-service
 go 1.25.0
 
 require (
-	github.com/UruhaLushia/sysproxy-go v1.0.0
+	github.com/UruhaLushia/sysproxy-go v1.0.1-0.20260506180946-a7e54738f47b
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/go-chi/render v1.0.3
 	github.com/kardianos/service v1.2.4
