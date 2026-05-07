@@ -59,7 +59,7 @@ func (windowsSysproxyGuardRunner) WaitChangeReady(ctx context.Context, opts *sys
 }
 
 func (windowsSysproxyGuardRunner) Query(opts *sysproxy.Options) (*sysproxy.ProxyConfig, error) {
-	return querySysproxyGuardSettings(opts)
+	return querySysproxyGuardSettings(windowsSysproxyGuardQueryOptions(opts))
 }
 
 func (windowsSysproxyGuardRunner) Apply(mode sysproxyGuardMode, opts *sysproxy.Options) error {
@@ -74,10 +74,18 @@ func (r *windowsTokenSysproxyGuardRunner) Query(opts *sysproxy.Options) (*syspro
 	var result *sysproxy.ProxyConfig
 	err := r.run(func() error {
 		var queryErr error
-		result, queryErr = querySysproxyGuardSettings(opts)
+		result, queryErr = querySysproxyGuardSettings(windowsSysproxyGuardQueryOptions(opts))
 		return queryErr
 	})
 	return result, err
+}
+
+func windowsSysproxyGuardQueryOptions(opts *sysproxy.Options) *sysproxy.Options {
+	queryOpts := cloneSysproxyOptions(opts)
+	if queryOpts.Device == "" {
+		queryOpts.UseRegistry = true
+	}
+	return queryOpts
 }
 
 func (r *windowsTokenSysproxyGuardRunner) Apply(mode sysproxyGuardMode, opts *sysproxy.Options) error {
