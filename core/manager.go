@@ -36,6 +36,9 @@ var coreLogEventRules = []coreLogEventRule{
 	{
 		parse: parseTailscaleAuthCoreLogEvent,
 	},
+	{
+		parse: parseTailscaleAuthDoneCoreLogEvent,
+	},
 }
 
 type processController interface {
@@ -242,6 +245,34 @@ func parseTailscaleAuthCoreLogEvent(line string) (CoreEvent, bool) {
 		Data: map[string]string{
 			"name": name,
 			"url":  url,
+		},
+	}, true
+}
+
+func parseTailscaleAuthDoneCoreLogEvent(line string) (CoreEvent, bool) {
+	const prefix = "[Tailscale]("
+	const marker = ") AuthLoop: state is Starting; done"
+
+	_, rest, ok := strings.Cut(line, prefix)
+	if !ok {
+		return CoreEvent{}, false
+	}
+
+	markerIndex := strings.Index(rest, marker)
+	if markerIndex <= 0 {
+		return CoreEvent{}, false
+	}
+
+	name := rest[:markerIndex]
+	if name == "" {
+		return CoreEvent{}, false
+	}
+
+	return CoreEvent{
+		Type:    CoreEventLog,
+		Message: "tailscale_auth_done",
+		Data: map[string]string{
+			"name": name,
 		},
 	}, true
 }
