@@ -232,8 +232,7 @@ func parseTailscaleAuthCoreLogEvent(line string) (CoreEvent, bool) {
 	if end := strings.IndexAny(url, " \t\"'<>"); end >= 0 {
 		url = url[:end]
 	}
-	if name == "" || !strings.Contains(url, "/register/") ||
-		(!strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://")) {
+	if name == "" || (!strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://")) {
 		return CoreEvent{}, false
 	}
 
