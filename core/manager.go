@@ -28,6 +28,16 @@ const (
 	startupLineLimit      = 16 * 1024
 )
 
+type coreLogEventRule struct {
+	parse func(string) (CoreEvent, bool)
+}
+
+var coreLogEventRules = []coreLogEventRule{
+	{
+		parse: parseTailscaleAuthCoreLogEvent,
+	},
+}
+
 type processController interface {
 	Attach(pid int32) error
 	PIDs() ([]int32, error)
@@ -86,6 +96,13 @@ type startupLogWatcher struct {
 	reported   bool
 }
 
+type coreLogEventWatcher struct {
+	manager    *CoreManager
+	mutex      sync.Mutex
+	lineBuffer string
+	active     atomic.Bool
+}
+
 func newStartupLogWatcher() *startupLogWatcher {
 	return &startupLogWatcher{fatal: make(chan error, 1)}
 }
@@ -128,6 +145,106 @@ func (w *startupLogWatcher) reportFatal(err error) {
 	}
 	w.reported = true
 	w.fatal <- err
+}
+
+func newCoreLogEventWatcher(manager *CoreManager) *coreLogEventWatcher {
+	watcher := &coreLogEventWatcher{manager: manager}
+	watcher.active.Store(true)
+	return watcher
+}
+
+func (w *coreLogEventWatcher) Write(p []byte) (int, error) {
+	if !w.active.Load() {
+		return len(p), nil
+	}
+
+	text := strings.ReplaceAll(string(p), "\r\n", "\n")
+
+	w.mutex.Lock()
+	defer w.mutex.Unlock()
+	if !w.active.Load() {
+		return len(p), nil
+	}
+
+	combined := w.lineBuffer + text
+	lines := strings.Split(combined, "\n")
+	if strings.HasSuffix(combined, "\n") {
+		w.lineBuffer = ""
+	} else {
+		w.lineBuffer = lines[len(lines)-1]
+		lines = lines[:len(lines)-1]
+		if len(w.lineBuffer) > startupLineLimit {
+			w.lineBuffer = w.lineBuffer[len(w.lineBuffer)-startupLineLimit:]
+		}
+	}
+
+	for _, line := range lines {
+		w.manager.publishCoreLogEvent(line)
+	}
+
+	return len(p), nil
+}
+
+func (w *coreLogEventWatcher) Stop() {
+	if !w.active.Swap(false) {
+		return
+	}
+
+	w.mutex.Lock()
+	line := w.lineBuffer
+	w.lineBuffer = ""
+	w.mutex.Unlock()
+
+	w.manager.publishCoreLogEvent(line)
+}
+
+func (cm *CoreManager) publishCoreLogEvent(line string) {
+	line = strings.TrimSpace(line)
+	if line == "" {
+		return
+	}
+
+	for _, rule := range coreLogEventRules {
+		event, ok := rule.parse(line)
+		if !ok {
+			continue
+		}
+		cm.publishCoreEvent(event)
+	}
+}
+
+func parseTailscaleAuthCoreLogEvent(line string) (CoreEvent, bool) {
+	const prefix = "[Tailscale]("
+	const marker = ") To start this tsnet server, restart with TS_AUTHKEY set, or go to: "
+
+	_, rest, ok := strings.Cut(line, prefix)
+	if !ok {
+		return CoreEvent{}, false
+	}
+
+	markerIndex := strings.Index(rest, marker)
+	if markerIndex <= 0 {
+		return CoreEvent{}, false
+	}
+
+	name := rest[:markerIndex]
+	url := strings.TrimSpace(rest[markerIndex+len(marker):])
+	if end := strings.IndexAny(url, " \t\"'<>"); end >= 0 {
+		url = url[:end]
+	}
+	if name == "" || !strings.Contains(url, "/register/") ||
+		(!strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://")) {
+		return CoreEvent{}, false
+	}
+
+	return CoreEvent{
+		Type:    CoreEventLog,
+		Message: "tailscale_auth",
+		Data: map[string]string{
+			"name": name,
+			"url":  url,
+		},
+	}, true
 }
 
 func (s *launchSession) addCleanup(cleanup func()) {
@@ -233,8 +350,10 @@ func (cm *CoreManager) startProcessLocked(profile *LaunchProfile, options launch
 			log.Printf("关闭核心日志文件失败: %v", err)
 		}
 	})
-	cmd.Stdout = io.MultiWriter(startupWatcher, logWriter)
-	cmd.Stderr = io.MultiWriter(errBuffer, startupWatcher, logWriter)
+	logEventWatcher := newCoreLogEventWatcher(cm)
+	launch.addCleanup(logEventWatcher.Stop)
+	cmd.Stdout = io.MultiWriter(startupWatcher, logEventWatcher, logWriter)
+	cmd.Stderr = io.MultiWriter(errBuffer, startupWatcher, logEventWatcher, logWriter)
 
 	if err := cmd.Start(); err != nil {
 		controller.Close()

@@ -16,17 +16,19 @@ const (
 	CoreEventTakeover      = "takeover"
 	CoreEventReady         = "ready"
 	CoreEventFailed        = "failed"
+	CoreEventLog           = "log"
 )
 
 type CoreEvent struct {
-	Seq     uint64    `json:"seq,omitempty"`
-	Type    string    `json:"type"`
-	Time    time.Time `json:"time"`
-	Running bool      `json:"running"`
-	PID     int32     `json:"pid,omitempty"`
-	OldPID  int32     `json:"old_pid,omitempty"`
-	Message string    `json:"message,omitempty"`
-	Error   string    `json:"error,omitempty"`
+	Seq     uint64            `json:"seq,omitempty"`
+	Type    string            `json:"type"`
+	Time    time.Time         `json:"time"`
+	Running bool              `json:"running"`
+	PID     int32             `json:"pid,omitempty"`
+	OldPID  int32             `json:"old_pid,omitempty"`
+	Message string            `json:"message,omitempty"`
+	Error   string            `json:"error,omitempty"`
+	Data    map[string]string `json:"data,omitempty"`
 }
 
 type coreEventHub struct {
@@ -79,7 +81,9 @@ func (cm *CoreManager) publishCoreEvent(event CoreEvent) {
 	cm.eventHub.mutex.Lock()
 	cm.eventHub.nextSeq++
 	event.Seq = cm.eventHub.nextSeq
-	cm.eventHub.last = event
+	if event.Type != CoreEventLog {
+		cm.eventHub.last = event
+	}
 	for ch := range cm.eventHub.subscribers {
 		select {
 		case ch <- event:
